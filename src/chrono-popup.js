@@ -53,9 +53,13 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.15';
+const CARD_VERSION = '0.1.16';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.16: title font-size 1.25rem -> 1.4rem, compensating for a 14px
+//          document root (14 * 1.4 = ~19.6px, targeting 20px). Tied to
+//          this specific root size - revisit if it doesn't hold on
+//          other installs.
 // v0.1.15: border-radius default 12px -> var(--ha-dialog-border-radius,
 //          28px), matching browser_mod's popup dialog.
 // v0.1.14: Title styling matched to MDC dialog title / browser_mod:
@@ -415,7 +419,7 @@ class ChronoPopupHost extends LitElement {
       background: var(--card-background-color);
     }
     .title {
-      font-size: 1.25rem;
+      font-size: 1.4rem;
       line-height: 2rem;
       letter-spacing: 0.0125em;
       font-weight: 500;
