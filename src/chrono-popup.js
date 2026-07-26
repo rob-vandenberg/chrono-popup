@@ -52,9 +52,14 @@ import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/st
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.6';
+const CARD_VERSION = '0.1.7';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.7: Extracted inline hardcoded defaults into named constants near
+//         the top of the file (KNOWN_DATA_KEYS, DEFAULT_STYLES), matching
+//         the DEFAULT_CONFIG/DEFAULT_FIELD convention used across the
+//         chrono-* family. No behavior change - values are unchanged,
+//         only where they're defined.
 // v0.1.6: Removed width/height/background/radius as named top-level keys.
 //         All CSS, including these, now lives under styles: only. The
 //         four values still default to the same auto/580px/90vw/etc.
@@ -95,6 +100,20 @@ console.info(
 );
 
 const EVENT_KEY = 'chrono-popup';
+
+// ─── Constants ────────────────────────────────────────────────────────────
+const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
+
+const DEFAULT_STYLES = {
+  width:        'auto',
+  minWidth:     '580px',
+  maxWidth:     '90vw',
+  height:       'auto',
+  minHeight:    '533px',
+  maxHeight:    '90vh',
+  background:   'var(--card-background-color, #1c1c1c)',
+  borderRadius: '12px',
+};
 
 // ─── Host ───────────────────────────────────────────────────────────────
 // One instance lives on document.body for the lifetime of the page. It is
@@ -144,14 +163,12 @@ class ChronoPopupHost extends LitElement {
     return ha ? ha.hass : undefined;
   }
 
-  static KNOWN_KEYS = ['title', 'view', 'styles', 'dismissable'];
-
   async open(data = {}) {
     for (const key of Object.keys(data)) {
-      if (!ChronoPopupHost.KNOWN_KEYS.includes(key)) {
+      if (!KNOWN_DATA_KEYS.includes(key)) {
         console.warn(
           `chrono-popup: unrecognized key "${key}" in event_data (view: "${data.view || '?'}"). ` +
-          `Recognized keys: ${ChronoPopupHost.KNOWN_KEYS.join(', ')}. CSS goes under "styles:".`
+          `Recognized keys: ${KNOWN_DATA_KEYS.join(', ')}. CSS goes under "styles:".`
         );
       }
     }
@@ -338,14 +355,7 @@ class ChronoPopupHost extends LitElement {
         <div
           class="frame"
           style=${styleMap({
-            width: 'auto',
-            minWidth: '580px',
-            maxWidth: '90vw',
-            height: 'auto',
-            minHeight: '533px',
-            maxHeight: '90vh',
-            background: 'var(--card-background-color, #1c1c1c)',
-            borderRadius: '12px',
+            ...DEFAULT_STYLES,
             ...styles,
           })}
         >
