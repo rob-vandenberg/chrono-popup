@@ -57,7 +57,7 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.30';
+const CARD_VERSION = '0.1.31';
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.30: Replaced panel/non-panel two-value padding with per-view-type
@@ -289,7 +289,7 @@ const DEFAULT_BODY_STYLES = {
 // DEFAULT_LAYOUT_PADDING.
 const DEFAULT_LAYOUT_PADDING = '0px 0px 12px 0px';
 const PANEL_LAYOUT_PADDING = '4px 24px 24px 24px';
-const SECTIONS_LAYOUT_PADDING = '0px 0px 0px 0px';
+const SECTIONS_LAYOUT_PADDING = '0px 0px 8px 0px';
 const MASONRY_LAYOUT_PADDING = '0px 0px 12px 0px';
 const SIDEBAR_LAYOUT_PADDING = '0px 0px 0px 0px';
 
