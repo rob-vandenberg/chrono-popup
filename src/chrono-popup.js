@@ -53,7 +53,7 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.11';
+const CARD_VERSION = '0.1.12';
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to
@@ -134,7 +134,22 @@ console.info(
   'background-color: #1E1E1E; color: #FFFFFF; font-weight: bold; padding: 2px 4px; border-radius: 0 3px 3px 0;'
 );
 
+// ─── Constants ────────────────────────────────────────────────────────────
+
 const EVENT_KEY = 'chrono-popup';
+
+const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
+
+const DEFAULT_STYLES = {
+  width:        'auto',
+  minWidth:     '580px',
+  maxWidth:     '90vw',
+  height:       'auto',
+  minHeight:    '533px',
+  maxHeight:    '90vh',
+  background:   'var(--card-background-color, #1c1c1c)',
+  borderRadius: '12px',
+};
 
 // Locates ha-panel-lovelace's own shadow root - the scoped custom element
 // registry boundary the whole real Lovelace tree (hui-view, hui-section,
@@ -152,20 +167,6 @@ function findLovelacePanelRoot() {
     ?.querySelector('home-assistant-main')?.shadowRoot
     ?.querySelector('ha-panel-lovelace')?.shadowRoot || null;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────
-const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
-
-const DEFAULT_STYLES = {
-  width:        'auto',
-  minWidth:     '580px',
-  maxWidth:     '90vw',
-  height:       'auto',
-  minHeight:    '533px',
-  maxHeight:    '90vh',
-  background:   'var(--card-background-color, #1c1c1c)',
-  borderRadius: '12px',
-};
 
 // ─── Host ───────────────────────────────────────────────────────────────
 // One instance is created on document.body initially, then relocated into
