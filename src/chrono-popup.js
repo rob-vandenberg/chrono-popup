@@ -57,9 +57,14 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.27';
+const CARD_VERSION = '0.1.28';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
+//          NON_PANEL_VIEW_BODY_PADDING '0' -> '0px 0px 0px 0px'.
+//          DEFAULT_FRAME_STYLES: minWidth 580px -> 540px, minHeight
+//          533px -> 10% (matching browser_mod's own classic-style
+//          --mdc-dialog-min-height: 10% default, confirmed via source).
 // v0.1.27: Fixed 0.1.26 - the 16px panel-padding value was hardcoded
 //          inline in render(), not in the Constants section. Extracted
 //          to PANEL_VIEW_BODY_PADDING and NON_PANEL_VIEW_BODY_PADDING.
@@ -225,10 +230,10 @@ const DEFAULT_OVERLAY_STYLES = {
 
 const DEFAULT_FRAME_STYLES = {
   width:        'auto',
-  minWidth:     '580px',
+  minWidth:     '540px',
   maxWidth:     '90vw',
   height:       'auto',
-  minHeight:    '533px',
+  minHeight:    '10%',
   maxHeight:    '90vh',
   background:   'var(--card-background-color, #1c1c1c)',
   borderRadius: 'var(--ha-dialog-border-radius, 28px)',
@@ -270,8 +275,8 @@ const DEFAULT_BODY_STYLES = {
 // Only panel views lack their own built-in spacing (masonry and sections
 // both self-pad) - this applies as .body's default padding, only when
 // the resolved view's type is "panel".
-const PANEL_VIEW_BODY_PADDING = '16px';
-const NON_PANEL_VIEW_BODY_PADDING = '0';
+const PANEL_VIEW_BODY_PADDING = '0px 12px 16px 12px';
+const NON_PANEL_VIEW_BODY_PADDING = '0px 0px 0px 0px';
 
 const DEFAULT_STATUS_STYLES = {
   padding: '24px',
