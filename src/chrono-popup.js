@@ -53,9 +53,12 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.13';
+const CARD_VERSION = '0.1.14';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.14: Title styling matched to MDC dialog title / browser_mod:
+//          font-size 1.25em -> 1.25rem, added line-height 2rem and
+//          letter-spacing 0.0125em.
 // v0.1.13: Header restyle - close button moved to top-left (before title
 //          in markup), title font-size 1.1em -> 1.25em, header layout
 //          space-between -> flex-start+gap so title sits right after the
@@ -410,7 +413,9 @@ class ChronoPopupHost extends LitElement {
       background: var(--card-background-color);
     }
     .title {
-      font-size: 1.25em;
+      font-size: 1.25rem;
+      line-height: 2rem;
+      letter-spacing: 0.0125em;
       font-weight: 500;
       color: var(--primary-text-color, #fff);
       white-space: nowrap;
