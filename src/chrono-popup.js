@@ -45,9 +45,14 @@ import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/st
 // only dashboards with an explicit url_path.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.4';
+const CARD_VERSION = '0.1.5';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.5: Default popup sizing changed from fixed width:640px/height:480px
+//         to width:auto/height:auto with min-width:580px, max-width:90vw,
+//         min-height:533px, max-height:90vh, so the popup fits its
+//         content by default. data.width/data.height (px shorthand) and
+//         styles (all six properties individually) still override.
 // v0.1.4: Added "styles" - a flat map of arbitrary CSS properties (incl.
 //         "--custom-properties") applied to the popup frame, spread on
 //         top of the width/height/background/radius defaults so user
@@ -87,7 +92,7 @@ class ChronoPopupHost extends LitElement {
     _open:    { state: true },
     _loading: { state: true },
     _error:   { state: true },
-    _opts:    { state: true }, // { title, width, height, background, radius, dismissable, styles }
+    _opts:    { state: true }, // { title, width, height, background, radius, dismissable, styles } - width/height undefined -> auto with min/max caps
     _view:    { state: true }, // { lovelace, index, viewConfig } for <hui-view>, once resolved
   };
 
@@ -128,8 +133,8 @@ class ChronoPopupHost extends LitElement {
   async open(data = {}) {
     this._opts = {
       title: data.title ?? '',
-      width: data.width ?? 640,
-      height: data.height ?? 480,
+      width: data.width, // undefined -> 'auto' (with min/max caps) applied in render
+      height: data.height,
       background: data.background ?? 'var(--card-background-color, #1c1c1c)',
       radius: data.radius ?? 12,
       dismissable: data.dismissable !== false, // backdrop-click-to-close, on by default
@@ -312,8 +317,12 @@ class ChronoPopupHost extends LitElement {
         <div
           class="frame"
           style=${styleMap({
-            width: `${width}px`,
-            height: `${height}px`,
+            width: width != null ? `${width}px` : 'auto',
+            minWidth: '580px',
+            maxWidth: '90vw',
+            height: height != null ? `${height}px` : 'auto',
+            minHeight: '533px',
+            maxHeight: '90vh',
             background,
             borderRadius: `${radius}px`,
             ...styles,
