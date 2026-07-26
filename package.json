@@ -1,0 +1,10 @@
+{
+  "name": "chrono-popup",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "terser src/chrono-popup.js -o dist/chrono-popup.js --compress --mangle"
+  },
+  "devDependencies": {
+    "terser": "^5.0.0"
+  }
+}
