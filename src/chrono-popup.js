@@ -34,20 +34,34 @@ import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/st
 //     chrono-popup:
 //       data:
 //         title: "Hello, world!"
-//         width: 640
-//         height: 580
-//         background: "#000000"
-//         radius: 50
 //         view: "/dashboard-test/uren-panel"
+//         dismissable: true
+//         styles:
+//           width: 640px
+//           height: 580px
+//           background: "#000000"
+//           border-radius: 50px
 //
 // `view` is "/<dashboard url_path>/<view path>". Both segments are
 // required in v1 - the default (unnamed) dashboard is not yet supported,
 // only dashboards with an explicit url_path.
+//
+// Recognized top-level keys: title, view, styles, dismissable. Anything
+// else is not read - console.warn()'d instead of failing silently. All
+// visual sizing/appearance (including what used to be named width/height/
+// background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.5';
+const CARD_VERSION = '0.1.6';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.6: Removed width/height/background/radius as named top-level keys.
+//         All CSS, including these, now lives under styles: only. The
+//         four values still default to the same auto/580px/90vw/etc.
+//         base, just as fixed values in the styleMap() call rather than
+//         reading from _opts. Added console.warn() for any unrecognized
+//         top-level key (recognized: title, view, styles, dismissable) -
+//         previously these failed silently.
 // v0.1.5: Default popup sizing changed from fixed width:640px/height:480px
 //         to width:auto/height:auto with min-width:580px, max-width:90vw,
 //         min-height:533px, max-height:90vh, so the popup fits its
@@ -92,7 +106,7 @@ class ChronoPopupHost extends LitElement {
     _open:    { state: true },
     _loading: { state: true },
     _error:   { state: true },
-    _opts:    { state: true }, // { title, width, height, background, radius, dismissable, styles } - width/height undefined -> auto with min/max caps
+    _opts:    { state: true }, // { title, dismissable, styles } - width/height/background/radius are fixed defaults, override only via styles
     _view:    { state: true }, // { lovelace, index, viewConfig } for <hui-view>, once resolved
   };
 
@@ -130,13 +144,20 @@ class ChronoPopupHost extends LitElement {
     return ha ? ha.hass : undefined;
   }
 
+  static KNOWN_KEYS = ['title', 'view', 'styles', 'dismissable'];
+
   async open(data = {}) {
+    for (const key of Object.keys(data)) {
+      if (!ChronoPopupHost.KNOWN_KEYS.includes(key)) {
+        console.warn(
+          `chrono-popup: unrecognized key "${key}" in event_data (view: "${data.view || '?'}"). ` +
+          `Recognized keys: ${ChronoPopupHost.KNOWN_KEYS.join(', ')}. CSS goes under "styles:".`
+        );
+      }
+    }
+
     this._opts = {
       title: data.title ?? '',
-      width: data.width, // undefined -> 'auto' (with min/max caps) applied in render
-      height: data.height,
-      background: data.background ?? 'var(--card-background-color, #1c1c1c)',
-      radius: data.radius ?? 12,
       dismissable: data.dismissable !== false, // backdrop-click-to-close, on by default
       styles: (data.styles && typeof data.styles === 'object') ? data.styles : {},
     };
@@ -305,7 +326,7 @@ class ChronoPopupHost extends LitElement {
   render() {
     if (!this._open) return html``;
 
-    const { title, width, height, background, radius, dismissable, styles } = this._opts;
+    const { title, dismissable, styles } = this._opts;
 
     return html`
       <div
@@ -317,14 +338,14 @@ class ChronoPopupHost extends LitElement {
         <div
           class="frame"
           style=${styleMap({
-            width: width != null ? `${width}px` : 'auto',
+            width: 'auto',
             minWidth: '580px',
             maxWidth: '90vw',
-            height: height != null ? `${height}px` : 'auto',
+            height: 'auto',
             minHeight: '533px',
             maxHeight: '90vh',
-            background,
-            borderRadius: `${radius}px`,
+            background: 'var(--card-background-color, #1c1c1c)',
+            borderRadius: '12px',
             ...styles,
           })}
         >
