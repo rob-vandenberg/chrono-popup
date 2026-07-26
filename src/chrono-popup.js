@@ -57,9 +57,21 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.24';
+const CARD_VERSION = '0.1.25';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.25: Extracted every remaining default visual value out of static
+//          CSS into named DEFAULT_*_STYLES constants (Constants section),
+//          matching the DEFAULT_FRAME_STYLES pattern - now merged via
+//          styleMap for every target (overlay, frame, header, title,
+//          close-button, body, status), not just frame. Removed dead
+//          max-width:96vw/max-height:96vh from .frame (always overridden
+//          by DEFAULT_FRAME_STYLES' inline 90vw/90vh anyway - unreachable
+//          leftover). TWO EXCEPTIONS, cannot be moved: .close-button:hover
+//          (pseudo-class, no inline equivalent) and .status/.status.error
+//          color (inline styles beat class selectors regardless of order,
+//          so moving color to a default would permanently override the
+//          error-red state - kept as class rules instead).
 // v0.1.24: Redistributed the old close-button's internal 12px cushion
 //          (from its 48px box vs 24px icon) into explicit header
 //          padding/gap, to visually match the pre-0.1.22 header exactly
@@ -198,6 +210,10 @@ const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
 // Valid sub-keys under styles: - one per distinct element in the template.
 const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
 
+const DEFAULT_OVERLAY_STYLES = {
+  background: 'rgba(0, 0, 0, 0.6)',
+};
+
 const DEFAULT_FRAME_STYLES = {
   width:        'auto',
   minWidth:     '580px',
@@ -207,6 +223,43 @@ const DEFAULT_FRAME_STYLES = {
   maxHeight:    '90vh',
   background:   'var(--card-background-color, #1c1c1c)',
   borderRadius: 'var(--ha-dialog-border-radius, 28px)',
+  boxShadow:    '0 8px 32px rgba(0, 0, 0, 0.5)',
+};
+
+const DEFAULT_HEADER_STYLES = {
+  gap:        '16px',
+  padding:    '20px 8px 12px 20px',
+  background: 'var(--card-background-color)',
+};
+
+const DEFAULT_TITLE_STYLES = {
+  fontSize:      '1.4rem',
+  lineHeight:    '2rem',
+  letterSpacing: '0.0125em',
+  fontWeight:    '500',
+  color:         'var(--primary-text-color, #fff)',
+  whiteSpace:    'nowrap',
+  overflow:      'hidden',
+  textOverflow:  'ellipsis',
+  marginLeft:    '4px',
+};
+
+const DEFAULT_CLOSE_BUTTON_STYLES = {
+  background:   'none',
+  border:       'none',
+  color:        'var(--primary-text-color, #fff)',
+  width:        '24px',
+  height:       '24px',
+  padding:      '0',
+  borderRadius: '50%',
+};
+
+const DEFAULT_BODY_STYLES = {
+  overflow: 'auto',
+};
+
+const DEFAULT_STATUS_STYLES = {
+  padding: '24px',
 };
 
 // Locates ha-panel-lovelace's own shadow root - the scoped custom element
@@ -442,7 +495,6 @@ class ChronoPopupHost extends LitElement {
     .overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
       z-index: 1000;
       display: flex;
       align-items: center;
@@ -452,38 +504,14 @@ class ChronoPopupHost extends LitElement {
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      max-width: 96vw;
-      max-height: 96vh;
     }
     .header {
       display: flex;
       align-items: center;
-      gap: 16px;
-      padding: 20px 8px 12px 20px;
       flex: 0 0 auto;
-      background: var(--card-background-color);
-    }
-    .title {
-      font-size: 1.4rem;
-      line-height: 2rem;
-      letter-spacing: 0.0125em;
-      font-weight: 500;
-      color: var(--primary-text-color, #fff);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      margin-left: 4px;
     }
     .close-button {
-      background: none;
-      border: none;
       cursor: pointer;
-      color: var(--primary-text-color, #fff);
-      width: 24px;
-      height: 24px;
-      padding: 0;
-      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -502,7 +530,6 @@ class ChronoPopupHost extends LitElement {
     .body {
       position: relative;
       flex: 1 1 auto;
-      overflow: auto;
     }
     .body hui-view {
       display: contents;
@@ -510,7 +537,6 @@ class ChronoPopupHost extends LitElement {
       padding: 0;
     }
     .status {
-      padding: 24px;
       color: var(--primary-text-color, #fff);
     }
     .status.error {
@@ -526,29 +552,31 @@ class ChronoPopupHost extends LitElement {
     return html`
       <div
         class="overlay"
-        style=${styleMap(styles.overlay)}
+        style=${styleMap({ ...DEFAULT_OVERLAY_STYLES, ...styles.overlay })}
         @click=${(ev) => {
           if (dismissable && ev.target === ev.currentTarget) this.close();
         }}
       >
         <div
           class="frame"
-          style=${styleMap({
-            ...DEFAULT_FRAME_STYLES,
-            ...styles.frame,
-          })}
+          style=${styleMap({ ...DEFAULT_FRAME_STYLES, ...styles.frame })}
         >
-          <div class="header" style=${styleMap(styles.header)}>
-            <button class="close-button" style=${styleMap(styles['close-button'])} @click=${() => this.close()} aria-label="Close">
+          <div class="header" style=${styleMap({ ...DEFAULT_HEADER_STYLES, ...styles.header })}>
+            <button
+              class="close-button"
+              style=${styleMap({ ...DEFAULT_CLOSE_BUTTON_STYLES, ...styles['close-button'] })}
+              @click=${() => this.close()}
+              aria-label="Close"
+            >
               <svg viewBox="0 0 24 24">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
-            <span class="title" style=${styleMap(styles.title)}>${title}</span>
+            <span class="title" style=${styleMap({ ...DEFAULT_TITLE_STYLES, ...styles.title })}>${title}</span>
           </div>
-          <div class="body" style=${styleMap(styles.body)}>
-            ${this._loading ? html`<div class="status" style=${styleMap(styles.status)}>Loading…</div>` : ''}
-            ${this._error ? html`<div class="status error" style=${styleMap(styles.status)}>${this._error}</div>` : ''}
+          <div class="body" style=${styleMap({ ...DEFAULT_BODY_STYLES, ...styles.body })}>
+            ${this._loading ? html`<div class="status" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>Loading…</div>` : ''}
+            ${this._error ? html`<div class="status error" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
               ? html`<hui-view
                   .hass=${this._getHass()}
