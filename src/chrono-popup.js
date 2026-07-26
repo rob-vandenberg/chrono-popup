@@ -53,7 +53,15 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.12';
+const CARD_VERSION = '0.1.13';
+
+// ─── Version History ────────────────────────────────────────────────────
+// v0.1.13: Header restyle - close button moved to top-left (before title
+//          in markup), title font-size 1.1em -> 1.25em, header layout
+//          space-between -> flex-start+gap so title sits right after the
+//          button, header background rgba(0,0,0,0.15) -> theme-aware
+//          var(--card-background-color).
+// v0.1.12: New baseline provided by user.
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to
@@ -395,13 +403,14 @@ class ChronoPopupHost extends LitElement {
     .header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: flex-start;
+      gap: 8px;
       padding: 8px 8px 8px 16px;
       flex: 0 0 auto;
-      background: rgba(0, 0, 0, 0.15);
+      background: var(--card-background-color);
     }
     .title {
-      font-size: 1.1em;
+      font-size: 1.25em;
       font-weight: 500;
       color: var(--primary-text-color, #fff);
       white-space: nowrap;
@@ -468,12 +477,12 @@ class ChronoPopupHost extends LitElement {
           })}
         >
           <div class="header">
-            <span class="title">${title}</span>
             <button class="close-btn" @click=${() => this.close()} aria-label="Close">
               <svg viewBox="0 0 24 24">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
+            <span class="title">${title}</span>
           </div>
           <div class="body">
             ${this._loading ? html`<div class="status">Loading…</div>` : ''}
