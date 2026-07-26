@@ -3,7 +3,7 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-0.1.21-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/badge/Version-0.1.25-brightgreen.svg?style=for-the-badge)](#)
 
   <img src="art/header.svg" width="780" alt="Chrono Popup Banner">
 
@@ -197,7 +197,7 @@ styles:
     padding: 8px 8px 0 8px
 ```
 
-The `frame` values shown above are also the defaults applied when `styles.frame` is omitted entirely - the popup sizes itself to its content automatically, capped so it never exceeds 90% of the screen's width or height. Every other target starts from its own built-in CSS with no equivalent defaults object; any property set under that target simply overrides the matching CSS rule.
+Every target has its own built-in defaults, applied automatically when omitted. Any property set under a target overrides the matching default. Two things can't be reached this way: the close button's hover effect (a `:hover` state, not expressible as a static override) and the error-message text color (kept separate so it doesn't get permanently overridden by a general status color).
 
 CSS custom properties (`--variable-name`) are supported on any target, and are the one styling mechanism that can reach into the view's own cards, since custom properties inherit through the shadow DOM boundaries that ordinary selectors cannot cross. For styling individual cards inside the view directly, use [card-mod](https://github.com/thomasloven/lovelace-card-mod) on those cards in the subview itself - `styles:` here only ever reaches the seven targets above, never into the rendered subview's own content.
 

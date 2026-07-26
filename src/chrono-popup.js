@@ -57,9 +57,14 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.25';
+const CARD_VERSION = '0.1.26';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.26: .body gets a default 16px padding only when the resolved
+//          view's type is "panel" - confirmed via real HA source that
+//          panel is the only view type with zero built-in spacing;
+//          masonry and sections both already self-pad. styles.body still
+//          overrides either way.
 // v0.1.25: Extracted every remaining default visual value out of static
 //          CSS into named DEFAULT_*_STYLES constants (Constants section),
 //          matching the DEFAULT_FRAME_STYLES pattern - now merged via
@@ -574,7 +579,11 @@ class ChronoPopupHost extends LitElement {
             </button>
             <span class="title" style=${styleMap({ ...DEFAULT_TITLE_STYLES, ...styles.title })}>${title}</span>
           </div>
-          <div class="body" style=${styleMap({ ...DEFAULT_BODY_STYLES, ...styles.body })}>
+          <div class="body" style=${styleMap({
+            ...DEFAULT_BODY_STYLES,
+            padding: this._view?.viewConfig?.type === 'panel' ? '16px' : '0',
+            ...styles.body,
+          })}>
             ${this._loading ? html`<div class="status" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>Loading…</div>` : ''}
             ${this._error ? html`<div class="status error" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
