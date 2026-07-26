@@ -53,9 +53,11 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.14';
+const CARD_VERSION = '0.1.15';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.15: border-radius default 12px -> var(--ha-dialog-border-radius,
+//          28px), matching browser_mod's popup dialog.
 // v0.1.14: Title styling matched to MDC dialog title / browser_mod:
 //          font-size 1.25em -> 1.25rem, added line-height 2rem and
 //          letter-spacing 0.0125em.
@@ -159,7 +161,7 @@ const DEFAULT_STYLES = {
   minHeight:    '533px',
   maxHeight:    '90vh',
   background:   'var(--card-background-color, #1c1c1c)',
-  borderRadius: '12px',
+  borderRadius: 'var(--ha-dialog-border-radius, 28px)',
 };
 
 // Locates ha-panel-lovelace's own shadow root - the scoped custom element
