@@ -53,9 +53,10 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.16';
+const CARD_VERSION = '0.1.18';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.18: close-btn svg 20px -> 24px, matching browser_mod's close icon.
 // v0.1.16: title font-size 1.25rem -> 1.4rem, compensating for a 14px
 //          document root (14 * 1.4 = ~19.6px, targeting 20px). Tied to
 //          this specific root size - revisit if it doesn't hold on
@@ -445,8 +446,8 @@ class ChronoPopupHost extends LitElement {
       background: rgba(255, 255, 255, 0.1);
     }
     .close-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 24px;
+      height: 24px;
       fill: currentColor;
     }
     .body {
