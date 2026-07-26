@@ -57,7 +57,16 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.29';
+const CARD_VERSION = '0.1.30';
+
+// ─── Version History ────────────────────────────────────────────────────
+// v0.1.30: Replaced panel/non-panel two-value padding with per-view-type
+//          constants (DEFAULT_LAYOUT_PADDING, PANEL_LAYOUT_PADDING,
+//          SECTIONS_LAYOUT_PADDING, MASONRY_LAYOUT_PADDING,
+//          SIDEBAR_LAYOUT_PADDING) via a lookup table keyed by
+//          viewConfig.type, falling back to DEFAULT_LAYOUT_PADDING for
+//          any unmatched/unknown type.
+// v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
@@ -275,8 +284,21 @@ const DEFAULT_BODY_STYLES = {
 // Only panel views lack their own built-in spacing (masonry and sections
 // both self-pad) - this applies as .body's default padding, only when
 // the resolved view's type is "panel".
-const PANEL_VIEW_BODY_PADDING = '4px 24px 24px 24px';
-const NON_PANEL_VIEW_BODY_PADDING = '0px 0px 0px 0px';
+// Per-view-type default .body padding. Real HA view types are masonry,
+// sections, panel, sidebar - unmatched/unknown types fall back to
+// DEFAULT_LAYOUT_PADDING.
+const DEFAULT_LAYOUT_PADDING = '0px 0px 12px 0px';
+const PANEL_LAYOUT_PADDING = '4px 24px 24px 24px';
+const SECTIONS_LAYOUT_PADDING = '0px 0px 0px 0px';
+const MASONRY_LAYOUT_PADDING = '0px 0px 12px 0px';
+const SIDEBAR_LAYOUT_PADDING = '0px 0px 0px 0px';
+
+const LAYOUT_PADDING_BY_TYPE = {
+  panel: PANEL_LAYOUT_PADDING,
+  sections: SECTIONS_LAYOUT_PADDING,
+  masonry: MASONRY_LAYOUT_PADDING,
+  sidebar: SIDEBAR_LAYOUT_PADDING,
+};
 
 const DEFAULT_STATUS_STYLES = {
   padding: '24px',
@@ -596,7 +618,7 @@ class ChronoPopupHost extends LitElement {
           </div>
           <div class="body" style=${styleMap({
             ...DEFAULT_BODY_STYLES,
-            padding: this._view?.viewConfig?.type === 'panel' ? PANEL_VIEW_BODY_PADDING : NON_PANEL_VIEW_BODY_PADDING,
+            padding: LAYOUT_PADDING_BY_TYPE[this._view?.viewConfig?.type] ?? DEFAULT_LAYOUT_PADDING,
             ...styles.body,
           })}>
             ${this._loading ? html`<div class="status" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>Loading…</div>` : ''}
