@@ -57,9 +57,14 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.21';
+const CARD_VERSION = '0.1.22';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.22: close-button default size 48px -> 24px, matching the icon
+//          exactly (no extra bounding box). Icon SVG now sized at 100%
+//          of the button instead of a fixed 24px, so any styles.close-button
+//          width/height override scales the icon along with the box,
+//          instead of leaving it fixed size inside a bigger button.
 // v0.1.21: styles: is now nested by target instead of applying only to
 //          the frame. Valid keys: overlay, frame, header, title,
 //          close-button, body, status - each optional, each applied to
@@ -463,8 +468,8 @@ class ChronoPopupHost extends LitElement {
       border: none;
       cursor: pointer;
       color: var(--primary-text-color, #fff);
-      width: 48px;
-      height: 48px;
+      width: 24px;
+      height: 24px;
       padding: 0;
       border-radius: 50%;
       display: flex;
@@ -478,8 +483,8 @@ class ChronoPopupHost extends LitElement {
     .close-button svg {
       display: block;
       flex-shrink: 0;
-      width: 24px;
-      height: 24px;
+      width: 100%;
+      height: 100%;
       fill: currentColor;
     }
     .body {
