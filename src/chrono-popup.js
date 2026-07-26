@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit@2.0.0/index.js?module';
 import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/style-map.js?module';
+import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-websocket@9.6.0/dist/index.js';
 
 // chrono-popup.js
 //
@@ -52,9 +53,16 @@ import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/st
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.7';
+const CARD_VERSION = '0.1.8';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.8: Fixed content not updating live (e.g. conditional cards not
+//         reacting to a toggle) - the popup sat outside Lovelace's normal
+//         hass-propagation tree, so it only ever had a snapshot from
+//         open() time. Now subscribes to subscribeEntities (from
+//         home-assistant-js-websocket, the same batched mechanism HA's
+//         own frontend uses) while open, and pushes a fresh hass onto the
+//         live <hui-view> on each update. Unsubscribes on close.
 // v0.1.7: Extracted inline hardcoded defaults into named constants near
 //         the top of the file (KNOWN_DATA_KEYS, DEFAULT_STYLES), matching
 //         the DEFAULT_CONFIG/DEFAULT_FIELD convention used across the
@@ -136,6 +144,7 @@ class ChronoPopupHost extends LitElement {
     this._error = null;
     this._opts = {};
     this._view = null;
+    this._hassUnsub = null; // unsubscribe fn for the live entity-updates subscription, while a popup is open
     this._onKeydown = this._onKeydown.bind(this);
   }
 
@@ -146,6 +155,7 @@ class ChronoPopupHost extends LitElement {
 
   disconnectedCallback() {
     document.removeEventListener('keydown', this._onKeydown);
+    this._unsubscribeFromUpdates();
     super.disconnectedCallback();
   }
 
@@ -156,11 +166,46 @@ class ChronoPopupHost extends LitElement {
   // Singleton hass access. This element is not part of any dashboard's
   // card tree, so HA never sets .hass on it directly - the standard
   // workaround for singleton/global elements is reading it off the live
-  // <home-assistant> element in the DOM at the moment it's actually
-  // needed, rather than trying to keep a subscription alive.
+  // <home-assistant> element in the DOM whenever it's needed. This alone
+  // only gives us a snapshot at open() time, though - see
+  // _subscribeToUpdates below for how we stay live after that.
   _getHass() {
     const ha = document.querySelector('home-assistant');
     return ha ? ha.hass : undefined;
+  }
+
+  // Placed cards get a fresh .hass pushed to them automatically on every
+  // state update, because Lovelace propagates it down the card tree. We
+  // sit outside that tree, so nothing does this for us - a popup opened
+  // once and never touched again would keep showing whatever hass looked
+  // like at open() time forever, breaking things like conditional cards.
+  //
+  // subscribeEntities is the same batched entity-update mechanism HA's
+  // own frontend entrypoint uses to build hass.states in the first place
+  // (see home-assistant-js-websocket) - it collapses bursts of
+  // simultaneous state_changed events into one callback rather than
+  // firing once per raw event. We use it purely as a "something changed"
+  // signal; on each callback we just re-read the real, already-updated
+  // hass from _getHass() and push it onto the live <hui-view>, rather
+  // than reconstructing our own separate state tree.
+  async _subscribeToUpdates(hass) {
+    this._unsubscribeFromUpdates();
+    if (!hass?.connection) return;
+    try {
+      this._hassUnsub = await subscribeEntities(hass.connection, () => {
+        const huiView = this.renderRoot?.querySelector('hui-view');
+        if (huiView) huiView.hass = this._getHass();
+      });
+    } catch (err) {
+      console.warn('chrono-popup: could not subscribe to entity updates - popup content will not update live', err);
+    }
+  }
+
+  _unsubscribeFromUpdates() {
+    if (typeof this._hassUnsub === 'function') {
+      try { this._hassUnsub(); } catch (err) { /* connection already gone - nothing to clean up */ }
+    }
+    this._hassUnsub = null;
   }
 
   async open(data = {}) {
@@ -183,6 +228,9 @@ class ChronoPopupHost extends LitElement {
     this._open = true;
     this._loading = true;
 
+    const hass = this._getHass();
+    if (hass) this._subscribeToUpdates(hass);
+
     try {
       this._view = await this._resolveView(data.view);
     } catch (err) {
@@ -194,6 +242,7 @@ class ChronoPopupHost extends LitElement {
 
   close() {
     this._open = false;
+    this._unsubscribeFromUpdates();
   }
 
   async _resolveView(view) {
