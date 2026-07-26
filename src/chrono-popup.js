@@ -53,9 +53,28 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.9';
+const CARD_VERSION = '0.1.11';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to
+//          the simpler declarative binding - tested and confirmed 0.1.10
+//          (the mount-point fix) was the actual cause, 0.1.9 wasn't
+//          needed. Removed updated(), _attachedView, .view-container.
+// v0.1.10: Fixed the thermostat card (and likely other built-in cards
+//          relying on similarly deep, lazily-registered components)
+//          failing to render inside the popup. Root cause: the popup
+//          host lived on document.body, outside the scoped custom
+//          element registry boundary ha-panel-lovelace establishes for
+//          real Lovelace content - confirmed via HA's actual source for
+//          the failing component (ha-state-control-climate-temperature),
+//          which showed .hass itself was undefined on it despite being
+//          set correctly on its parent. The host now relocates into
+//          ha-panel-lovelace's own shadow root on open(), so everything
+//          we render shares the same registry scope as a normal
+//          dashboard page. KNOWN RISK, not yet confirmed either way:
+//          the backdrop's position:fixed could theoretically be trapped
+//          by a transformed ancestor somewhere in that tree - watch for
+//          mispositioning/clipping specifically, separate from this fix.
 // v0.1.9: Fixed a race where some cards (confirmed: the thermostat card's
 //         +/- stepper control) could throw on first render because .hass
 //         wasn't guaranteed to be set before the element connected and
@@ -117,6 +136,23 @@ console.info(
 
 const EVENT_KEY = 'chrono-popup';
 
+// Locates ha-panel-lovelace's own shadow root - the scoped custom element
+// registry boundary the whole real Lovelace tree (hui-view, hui-section,
+// hui-card, and every card/control inside them) is built within. HA's
+// frontend gives each Lovelace panel instance its own isolated registry
+// via a scoped-custom-element-registry mechanism (visible directly in
+// browser stack traces as scoped-custom-element-registry.ts) - elements
+// created outside that boundary, like our popup was on document.body,
+// don't share it, which is what caused specific built-in components
+// (confirmed: the thermostat card's temperature stepper) to fail while
+// simpler third-party cards worked fine.
+function findLovelacePanelRoot() {
+  return document
+    .querySelector('home-assistant')?.shadowRoot
+    ?.querySelector('home-assistant-main')?.shadowRoot
+    ?.querySelector('ha-panel-lovelace')?.shadowRoot || null;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────
 const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
 
@@ -132,7 +168,9 @@ const DEFAULT_STYLES = {
 };
 
 // ─── Host ───────────────────────────────────────────────────────────────
-// One instance lives on document.body for the lifetime of the page. It is
+// One instance is created on document.body initially, then relocated into
+// ha-panel-lovelace's own shadow root on first open() - see
+// findLovelacePanelRoot() above for why. It is
 // not addressed by id/entity - it simply reacts to whichever "chrono-popup"
 // ll-custom event most recently arrived. Only one popup is shown at a
 // time in v1; a new trigger while one is already open replaces it.
@@ -153,7 +191,6 @@ class ChronoPopupHost extends LitElement {
     this._opts = {};
     this._view = null;
     this._hassUnsub = null; // unsubscribe fn for the live entity-updates subscription, while a popup is open
-    this._attachedView = null; // tracks which _view object the imperative <hui-view> was built for
     this._onKeydown = this._onKeydown.bind(this);
   }
 
@@ -218,6 +255,18 @@ class ChronoPopupHost extends LitElement {
   }
 
   async open(data = {}) {
+    // Relocate into ha-panel-lovelace's own shadow root, if we can find
+    // it and aren't already there - see findLovelacePanelRoot() above.
+    // Done here rather than at module-load time because this resource
+    // can load before any Lovelace panel exists yet; by the time open()
+    // runs, the trigger itself is a card on that panel, so it's
+    // guaranteed to exist. Falls back to wherever we already are
+    // (document.body, from initial singleton setup) if not found.
+    const lovelaceRoot = findLovelacePanelRoot();
+    if (lovelaceRoot && this.parentNode !== lovelaceRoot) {
+      lovelaceRoot.appendChild(this);
+    }
+
     for (const key of Object.keys(data)) {
       if (!KNOWN_DATA_KEYS.includes(key)) {
         console.warn(
@@ -234,7 +283,6 @@ class ChronoPopupHost extends LitElement {
     };
     this._error = null;
     this._view = null;
-    this._attachedView = null;
     this._open = true;
     this._loading = true;
 
@@ -430,41 +478,19 @@ class ChronoPopupHost extends LitElement {
             ${this._loading ? html`<div class="status">Loading…</div>` : ''}
             ${this._error ? html`<div class="status error">${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
-              ? html`<div class="view-container"></div>`
+              ? html`<hui-view
+                  .hass=${this._getHass()}
+                  .narrow=${false}
+                  .lovelace=${this._view.lovelace}
+                  .index=${this._view.index}
+                  .isStrategyView=${false}
+                  .viewConfig=${this._view.viewConfig}
+                ></hui-view>`
               : ''}
           </div>
         </div>
       </div>
     `;
-  }
-
-  // Builds <hui-view> imperatively, mirroring embedded-view-card's proven
-  // sequence: create the element, set every property directly, and only
-  // append it to the DOM once all of them are already in their final
-  // state. Doing this declaratively inside the html`` template above
-  // creates and connects the element as part of the same commit that sets
-  // its properties, without that same guarantee - which was the actual
-  // cause of the thermostat card's stepper control throwing on first
-  // render (it read .hass before Lit had finished setting it).
-  updated() {
-    if (!this._open || this._loading || this._error || !this._view) return;
-    if (this._attachedView === this._view) return; // already built for this resolved view
-
-    const container = this.renderRoot?.querySelector('.view-container');
-    if (!container) return; // not rendered yet - next updated() cycle will catch it
-
-    const huiView = document.createElement('hui-view');
-    huiView.setAttribute('style', 'margin:0;padding:0;display:contents;');
-    huiView.hass = this._getHass();
-    huiView.narrow = false;
-    huiView.lovelace = this._view.lovelace;
-    huiView.index = this._view.index;
-    huiView.isStrategyView = false;
-    huiView.viewConfig = this._view.viewConfig;
-
-    container.innerHTML = '';
-    container.appendChild(huiView);
-    this._attachedView = this._view;
   }
 }
 
