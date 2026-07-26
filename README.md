@@ -3,7 +3,7 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-0.1.8-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/badge/Version-0.1.21-brightgreen.svg?style=for-the-badge)](#)
 
   <img src="art/header.svg" width="780" alt="Chrono Popup Banner">
 
@@ -135,10 +135,13 @@ tap_action:
       view: "/dashboard-test/uren-panel"
       dismissable: true
       styles:
-        width: 640px
-        height: 580px
-        background: "#000000"
-        border-radius: 50px
+        frame:
+          width: 640px
+          height: 580px
+          background: "#000000"
+          border-radius: 50px
+        header:
+          padding: 8px 8px 0 8px
 ```
 
 ### Recognized Keys
@@ -147,8 +150,8 @@ tap_action:
 | :--- | :--- | :--- | :--- |
 | `title` | string | `''` | Text shown in the popup's header bar |
 | `view` | string | *required* | The view to display - see [The `view` Path](#the-view-path) below |
-| `styles` | object | `{}` | Any CSS property applied to the popup frame - see [Styling](#styling) below |
-| `dismissable` | boolean | `true` | Whether clicking the backdrop closes the popup. When `false`, only the close button works. |
+| `styles` | object | `{}` | Per-element CSS, nested by target - see [Styling](#styling) below |
+| `dismissable` | boolean | `true` | Whether clicking outside the popup closes it. When `false`, only the close button works. |
 
 Any other key is not recognized and will not be applied. A `console.warn()` is logged naming the unrecognized key rather than failing silently.
 
@@ -167,23 +170,36 @@ The default (unnamed) dashboard is not currently supported - only dashboards wit
 
 ### Styling
 
-All visual properties - size, background, border, radius, anything else CSS can express - are set through `styles:`, using real CSS property names:
+`styles:` is nested by target - one optional sub-key per distinct element in the popup, each accepting any real CSS property name:
+
+| Target | Element |
+| :--- | :--- |
+| `overlay` | The full-screen backdrop behind the popup |
+| `frame` | The popup window itself (size, background, border-radius) |
+| `header` | The title bar |
+| `title` | The title text |
+| `close-button` | The close button |
+| `body` | The content area where the subview renders |
+| `status` | Loading/error text shown inside the body |
 
 ```yaml
 styles:
-  width: auto
-  min-width: 580px
-  max-width: 90vw
-  height: auto
-  min-height: 533px
-  max-height: 90vh
-  background: var(--card-background-color, #1c1c1c)
-  border-radius: 12px
+  frame:
+    width: auto
+    min-width: 580px
+    max-width: 90vw
+    height: auto
+    min-height: 533px
+    max-height: 90vh
+    background: var(--card-background-color, #1c1c1c)
+    border-radius: var(--ha-dialog-border-radius, 28px)
+  header:
+    padding: 8px 8px 0 8px
 ```
 
-These are also the defaults applied when `styles:` is omitted entirely - the popup sizes itself to its content automatically, capped so it never exceeds 90% of the screen's width or height.
+The `frame` values shown above are also the defaults applied when `styles.frame` is omitted entirely - the popup sizes itself to its content automatically, capped so it never exceeds 90% of the screen's width or height. Every other target starts from its own built-in CSS with no equivalent defaults object; any property set under that target simply overrides the matching CSS rule.
 
-CSS custom properties (`--variable-name`) are supported too, and are the one styling mechanism that can reach into the view's own cards, since custom properties inherit through the shadow DOM boundaries that ordinary selectors cannot cross. For styling individual cards inside the view directly, use [card-mod](https://github.com/thomasloven/lovelace-card-mod) on those cards in the subview itself.
+CSS custom properties (`--variable-name`) are supported on any target, and are the one styling mechanism that can reach into the view's own cards, since custom properties inherit through the shadow DOM boundaries that ordinary selectors cannot cross. For styling individual cards inside the view directly, use [card-mod](https://github.com/thomasloven/lovelace-card-mod) on those cards in the subview itself - `styles:` here only ever reaches the seven targets above, never into the rendered subview's own content.
 
 ---
 
