@@ -57,7 +57,7 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.28';
+const CARD_VERSION = '0.1.29';
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
@@ -275,7 +275,7 @@ const DEFAULT_BODY_STYLES = {
 // Only panel views lack their own built-in spacing (masonry and sections
 // both self-pad) - this applies as .body's default padding, only when
 // the resolved view's type is "panel".
-const PANEL_VIEW_BODY_PADDING = '0px 12px 16px 12px';
+const PANEL_VIEW_BODY_PADDING = '4px 24px 24px 24px';
 const NON_PANEL_VIEW_BODY_PADDING = '0px 0px 0px 0px';
 
 const DEFAULT_STATUS_STYLES = {
