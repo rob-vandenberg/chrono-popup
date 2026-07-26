@@ -38,24 +38,35 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 //         view: "/dashboard-test/uren-panel"
 //         dismissable: true
 //         styles:
-//           width: 640px
-//           height: 580px
-//           background: "#000000"
-//           border-radius: 50px
+//           frame:
+//             width: 640px
+//             height: 580px
+//             background: "#000000"
+//             border-radius: 50px
+//           header:
+//             padding: 8px 8px 0 8px
 //
 // `view` is "/<dashboard url_path>/<view path>". Both segments are
 // required in v1 - the default (unnamed) dashboard is not yet supported,
 // only dashboards with an explicit url_path.
 //
 // Recognized top-level keys: title, view, styles, dismissable. Anything
-// else is not read - console.warn()'d instead of failing silently. All
-// visual sizing/appearance (including what used to be named width/height/
-// background/radius shorthand fields) lives under styles: now.
+// else is not read - console.warn()'d instead of failing silently.
+// styles: is nested by target - see STYLE_TARGETS below for the full
+// list of elements that can be styled (overlay, frame, header, title,
+// close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.20';
+const CARD_VERSION = '0.1.21';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.21: styles: is now nested by target instead of applying only to
+//          the frame. Valid keys: overlay, frame, header, title,
+//          close-button, body, status - each optional, each applied to
+//          its own element. Renamed .backdrop -> .overlay and
+//          .close-btn -> .close-button (CSS + markup) to match. Frame's
+//          previous auto-sizing defaults moved to DEFAULT_FRAME_STYLES,
+//          merged under styles.frame specifically now.
 // v0.1.20: header padding 8px -> 8px 8px 0 8px, removing our own
 //          contribution to the header-to-content gap. Actually applied
 //          this time - previously only described, never written.
@@ -167,7 +178,10 @@ const EVENT_KEY = 'chrono-popup';
 
 const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
 
-const DEFAULT_STYLES = {
+// Valid sub-keys under styles: - one per distinct element in the template.
+const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
+
+const DEFAULT_FRAME_STYLES = {
   width:        'auto',
   minWidth:     '580px',
   maxWidth:     '90vw',
@@ -304,10 +318,16 @@ class ChronoPopupHost extends LitElement {
       }
     }
 
+    const rawStyles = (data.styles && typeof data.styles === 'object') ? data.styles : {};
+    const styles = {};
+    for (const key of STYLE_TARGETS) {
+      styles[key] = (rawStyles[key] && typeof rawStyles[key] === 'object') ? rawStyles[key] : {};
+    }
+
     this._opts = {
       title: data.title ?? '',
       dismissable: data.dismissable !== false, // backdrop-click-to-close, on by default
-      styles: (data.styles && typeof data.styles === 'object') ? data.styles : {},
+      styles,
     };
     this._error = null;
     this._view = null;
@@ -402,7 +422,7 @@ class ChronoPopupHost extends LitElement {
     :host {
       display: contents;
     }
-    .backdrop {
+    .overlay {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.6);
@@ -438,7 +458,7 @@ class ChronoPopupHost extends LitElement {
       text-overflow: ellipsis;
       margin-left: 4px;
     }
-    .close-btn {
+    .close-button {
       background: none;
       border: none;
       cursor: pointer;
@@ -452,10 +472,10 @@ class ChronoPopupHost extends LitElement {
       justify-content: center;
       flex: 0 0 auto;
     }
-    .close-btn:hover {
+    .close-button:hover {
       background: rgba(255, 255, 255, 0.1);
     }
-    .close-btn svg {
+    .close-button svg {
       display: block;
       flex-shrink: 0;
       width: 24px;
@@ -488,7 +508,8 @@ class ChronoPopupHost extends LitElement {
 
     return html`
       <div
-        class="backdrop"
+        class="overlay"
+        style=${styleMap(styles.overlay)}
         @click=${(ev) => {
           if (dismissable && ev.target === ev.currentTarget) this.close();
         }}
@@ -496,21 +517,21 @@ class ChronoPopupHost extends LitElement {
         <div
           class="frame"
           style=${styleMap({
-            ...DEFAULT_STYLES,
-            ...styles,
+            ...DEFAULT_FRAME_STYLES,
+            ...styles.frame,
           })}
         >
-          <div class="header">
-            <button class="close-btn" @click=${() => this.close()} aria-label="Close">
+          <div class="header" style=${styleMap(styles.header)}>
+            <button class="close-button" style=${styleMap(styles['close-button'])} @click=${() => this.close()} aria-label="Close">
               <svg viewBox="0 0 24 24">
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
-            <span class="title">${title}</span>
+            <span class="title" style=${styleMap(styles.title)}>${title}</span>
           </div>
-          <div class="body">
-            ${this._loading ? html`<div class="status">Loading…</div>` : ''}
-            ${this._error ? html`<div class="status error">${this._error}</div>` : ''}
+          <div class="body" style=${styleMap(styles.body)}>
+            ${this._loading ? html`<div class="status" style=${styleMap(styles.status)}>Loading…</div>` : ''}
+            ${this._error ? html`<div class="status error" style=${styleMap(styles.status)}>${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
               ? html`<hui-view
                   .hass=${this._getHass()}
