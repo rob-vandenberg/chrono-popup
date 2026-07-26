@@ -53,9 +53,12 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.19';
+const CARD_VERSION = '0.1.20';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.20: header padding 8px -> 8px 8px 0 8px, removing our own
+//          contribution to the header-to-content gap. Actually applied
+//          this time - previously only described, never written.
 // v0.1.19: Full header rewrite matching HA/browser_mod dialog header
 //          conventions. Fixed the 20x24 SVG sizing bug: default inline
 //          SVG display + flex shrink was compressing width only - added
@@ -420,7 +423,7 @@ class ChronoPopupHost extends LitElement {
       display: flex;
       align-items: center;
       gap: 4px;
-      padding: 8px;
+      padding: 8px 8px 0 8px;
       flex: 0 0 auto;
       background: var(--card-background-color);
     }
