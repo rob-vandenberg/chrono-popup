@@ -57,9 +57,13 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.26';
+const CARD_VERSION = '0.1.27';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.27: Fixed 0.1.26 - the 16px panel-padding value was hardcoded
+//          inline in render(), not in the Constants section. Extracted
+//          to PANEL_VIEW_BODY_PADDING and NON_PANEL_VIEW_BODY_PADDING.
+//          No behavior change.
 // v0.1.26: .body gets a default 16px padding only when the resolved
 //          view's type is "panel" - confirmed via real HA source that
 //          panel is the only view type with zero built-in spacing;
@@ -262,6 +266,12 @@ const DEFAULT_CLOSE_BUTTON_STYLES = {
 const DEFAULT_BODY_STYLES = {
   overflow: 'auto',
 };
+
+// Only panel views lack their own built-in spacing (masonry and sections
+// both self-pad) - this applies as .body's default padding, only when
+// the resolved view's type is "panel".
+const PANEL_VIEW_BODY_PADDING = '16px';
+const NON_PANEL_VIEW_BODY_PADDING = '0';
 
 const DEFAULT_STATUS_STYLES = {
   padding: '24px',
@@ -581,7 +591,7 @@ class ChronoPopupHost extends LitElement {
           </div>
           <div class="body" style=${styleMap({
             ...DEFAULT_BODY_STYLES,
-            padding: this._view?.viewConfig?.type === 'panel' ? '16px' : '0',
+            padding: this._view?.viewConfig?.type === 'panel' ? PANEL_VIEW_BODY_PADDING : NON_PANEL_VIEW_BODY_PADDING,
             ...styles.body,
           })}>
             ${this._loading ? html`<div class="status" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>Loading…</div>` : ''}
