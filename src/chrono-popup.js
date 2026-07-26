@@ -53,9 +53,15 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // background/radius shorthand fields) lives under styles: now.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.18';
+const CARD_VERSION = '0.1.19';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.19: Full header rewrite matching HA/browser_mod dialog header
+//          conventions. Fixed the 20x24 SVG sizing bug: default inline
+//          SVG display + flex shrink was compressing width only - added
+//          display:block + flex-shrink:0. Close button 32px -> 48px
+//          (real HA icon-button touch target), header padding matched
+//          to MDC convention, title margin-left:4px for spacing.
 // v0.1.18: close-btn svg 20px -> 24px, matching browser_mod's close icon.
 // v0.1.16: title font-size 1.25rem -> 1.4rem, compensating for a 14px
 //          document root (14 * 1.4 = ~19.6px, targeting 20px). Tied to
@@ -413,9 +419,8 @@ class ChronoPopupHost extends LitElement {
     .header {
       display: flex;
       align-items: center;
-      justify-content: flex-start;
-      gap: 8px;
-      padding: 8px 8px 8px 16px;
+      gap: 4px;
+      padding: 8px;
       flex: 0 0 auto;
       background: var(--card-background-color);
     }
@@ -428,14 +433,16 @@ class ChronoPopupHost extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-left: 4px;
     }
     .close-btn {
       background: none;
       border: none;
       cursor: pointer;
       color: var(--primary-text-color, #fff);
-      width: 32px;
-      height: 32px;
+      width: 48px;
+      height: 48px;
+      padding: 0;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -446,6 +453,8 @@ class ChronoPopupHost extends LitElement {
       background: rgba(255, 255, 255, 0.1);
     }
     .close-btn svg {
+      display: block;
+      flex-shrink: 0;
       width: 24px;
       height: 24px;
       fill: currentColor;
