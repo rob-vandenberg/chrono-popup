@@ -57,9 +57,16 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.23';
+const CARD_VERSION = '0.1.24';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.24: Redistributed the old close-button's internal 12px cushion
+//          (from its 48px box vs 24px icon) into explicit header
+//          padding/gap, to visually match the pre-0.1.22 header exactly
+//          while keeping the button's actual size at 24px. padding
+//          8px 8px 8px 16px -> 20px 8px 12px 20px, gap 4px -> 16px.
+//          Total header height unchanged (56px), so .body's position
+//          and the v0.1.20 gap fix are unaffected.
 // v0.1.23: header padding 8px 8px 0 8px -> 8px 8px 8px 16px, reverted to
 //          the original v0.1.0 value now that close-button no longer
 //          provides its own built-in spacing (24px, not 48px). NOTE:
@@ -452,8 +459,8 @@ class ChronoPopupHost extends LitElement {
     .header {
       display: flex;
       align-items: center;
-      gap: 4px;
-      padding: 8px 8px 8px 16px;
+      gap: 16px;
+      padding: 20px 8px 12px 20px;
       flex: 0 0 auto;
       background: var(--card-background-color);
     }
