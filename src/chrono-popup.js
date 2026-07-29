@@ -57,7 +57,15 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.34';
+const CARD_VERSION = '0.1.35';
+
+// ─── Version History ────────────────────────────────────────────────────
+// v0.1.35: Popup now anchors from the top instead of centering vertically
+//          - .overlay's align-items: center (hardcoded) -> alignItems:
+//          'flex-start' (DEFAULT_OVERLAY_STYLES, overridable). Added
+//          DEFAULT_FRAME_STYLES.marginTop: '10vh' - relative like a
+//          percentage, but physically can't push the popup off-screen
+//          the way a negative margin-top from center could.
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.34: Added validation for styles.target values in open(); logs a
@@ -144,9 +152,6 @@ const CARD_VERSION = '0.1.34';
 //          space-between -> flex-start+gap so title sits right after the
 //          button, header background rgba(0,0,0,0.15) -> theme-aware
 //          var(--card-background-color).
-// v0.1.12: New baseline provided by user.
-
-// ─── Version History ────────────────────────────────────────────────────
 // v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to
 //          the simpler declarative binding - tested and confirmed 0.1.10
 //          (the mount-point fix) was the actual cause, 0.1.9 wasn't
@@ -236,6 +241,7 @@ const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'b
 
 const DEFAULT_OVERLAY_STYLES = {
   background: 'rgba(0, 0, 0, 0.6)',
+  alignItems: 'flex-start',
 };
 
 const DEFAULT_FRAME_STYLES = {
@@ -245,6 +251,7 @@ const DEFAULT_FRAME_STYLES = {
   height:       'auto',
   minHeight:    '10%',
   maxHeight:    '90vh',
+  marginTop:    '10vh',
   background:   'var(--card-background-color, #1c1c1c)',
   borderRadius: 'var(--ha-dialog-border-radius, 28px)',
   boxShadow:    '0 8px 32px rgba(0, 0, 0, 0.5)',
@@ -551,7 +558,6 @@ class ChronoPopupHost extends LitElement {
       inset: 0;
       z-index: 1000;
       display: flex;
-      align-items: center;
       justify-content: center;
     }
     .frame {
