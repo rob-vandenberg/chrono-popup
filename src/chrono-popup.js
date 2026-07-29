@@ -57,18 +57,19 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.32';
+const CARD_VERSION = '0.1.34';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v0.1.34: Added validation for styles.target values in open(); logs a
+//          warning when a styles target exists but is not an object. Also
+//          added a warning when the supplied view path contains extra
+//          slash-delimited segments beyond dashboard/view.
 // v0.1.30: Replaced panel/non-panel two-value padding with per-view-type
 //          constants (DEFAULT_LAYOUT_PADDING, PANEL_LAYOUT_PADDING,
 //          SECTIONS_LAYOUT_PADDING, MASONRY_LAYOUT_PADDING,
 //          SIDEBAR_LAYOUT_PADDING) via a lookup table keyed by
 //          viewConfig.type, falling back to DEFAULT_LAYOUT_PADDING for
 //          any unmatched/unknown type.
-// v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
-
-// ─── Version History ────────────────────────────────────────────────────
 // v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
 //          NON_PANEL_VIEW_BODY_PADDING '0' -> '0px 0px 0px 0px'.
 //          DEFAULT_FRAME_STYLES: minWidth 580px -> 540px, minHeight
@@ -433,7 +434,13 @@ class ChronoPopupHost extends LitElement {
     const rawStyles = (data.styles && typeof data.styles === 'object') ? data.styles : {};
     const styles = {};
     for (const key of STYLE_TARGETS) {
-      styles[key] = (rawStyles[key] && typeof rawStyles[key] === 'object') ? rawStyles[key] : {};
+      const value = rawStyles[key];
+      if (value != null && typeof value !== 'object') {
+        console.warn(
+          `chrono-popup: styles.${key} must be an object, got ${typeof value}. Ignoring invalid style value.`
+        );
+      }
+      styles[key] = (value && typeof value === 'object') ? value : {};
     }
 
     this._opts = {
@@ -473,6 +480,11 @@ class ChronoPopupHost extends LitElement {
         `chrono-popup: "view" must include both a dashboard and a view, e.g. "/my-dashboard/my-view" (got "${view}")`
       );
     }
+    if (parts.length > 2) {
+      console.warn(
+        `chrono-popup: "view" contains extra path segments; only the first dashboard and view are used. Got "${view}"`
+      );
+    }
     const [dashboardPath, viewPath] = parts;
 
     const hass = this._getHass();
@@ -505,9 +517,9 @@ class ChronoPopupHost extends LitElement {
 
   // Same rule shape HA's own dashboard (and embedded-view-card) use:
   // view.visible / visibility / users, each entry a user id string or an
-  // object carrying one. No rules present -> visible to everyone. Can't
-  // determine the current user id -> fail open, matching HA's own
-  // behavior rather than blocking access we can't actually evaluate.
+  // object carrying one. No rules present -> visible to everyone. If we
+  // can't determine the current user id, we treat the view as visible
+  // rather than blocking it based on missing user info.
   _isViewVisibleToUser(view, hass) {
     const uid = hass?.user?.id || null;
     if (!uid || !view) return true;
