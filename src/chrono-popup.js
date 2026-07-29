@@ -57,7 +57,18 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.35';
+const CARD_VERSION = '0.1.36';
+
+// ─── Version History ────────────────────────────────────────────────────
+// v0.1.36: Wrapped six defaults with real HA/MDC dialog CSS variables
+//          (our prior values kept as fallback via var()'s second arg):
+//          frame max-width -> --mdc-dialog-max-width, max-height ->
+//          --mdc-dialog-max-height, min-height -> --mdc-dialog-min-height,
+//          margin-top -> --dialog-surface-margin-top (fallback matches
+//          HA's own max(40px, safe-area-inset) formula), background ->
+//          --ha-dialog-surface-background, overlay background (scrim) ->
+//          --mdc-dialog-scrim-color. No variable found for min-width or
+//          box-shadow - those stay as plain values.
 
 // ─── Version History ────────────────────────────────────────────────────
 // v0.1.35: Popup now anchors from the top instead of centering vertically
@@ -240,19 +251,19 @@ const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
 const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
 
 const DEFAULT_OVERLAY_STYLES = {
-  background: 'rgba(0, 0, 0, 0.6)',
+  background: 'var(--mdc-dialog-scrim-color, rgba(0, 0, 0, 0.6))',
   alignItems: 'flex-start',
 };
 
 const DEFAULT_FRAME_STYLES = {
   width:        'auto',
   minWidth:     '540px',
-  maxWidth:     '90vw',
+  maxWidth:     'var(--mdc-dialog-max-width, 90vw)',
   height:       'auto',
-  minHeight:    '10%',
-  maxHeight:    '90vh',
-  marginTop:    '10vh',
-  background:   'var(--card-background-color, #1c1c1c)',
+  minHeight:    'var(--mdc-dialog-min-height, 10%)',
+  maxHeight:    'var(--mdc-dialog-max-height, 90vh)',
+  marginTop:    'var(--dialog-surface-margin-top, max(40px, var(--safe-area-inset-top, 0px)))',
+  background:   'var(--ha-dialog-surface-background, var(--card-background-color, #1c1c1c))',
   borderRadius: 'var(--ha-dialog-border-radius, 28px)',
   boxShadow:    '0 8px 32px rgba(0, 0, 0, 0.5)',
 };
