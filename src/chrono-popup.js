@@ -57,28 +57,16 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.36';
+const CARD_VERSION = '0.1.40';
 
 // ─── Version History ────────────────────────────────────────────────────
-// v0.1.36: Wrapped six defaults with real HA/MDC dialog CSS variables
-//          (our prior values kept as fallback via var()'s second arg):
-//          frame max-width -> --mdc-dialog-max-width, max-height ->
-//          --mdc-dialog-max-height, min-height -> --mdc-dialog-min-height,
-//          margin-top -> --dialog-surface-margin-top (fallback matches
-//          HA's own max(40px, safe-area-inset) formula), background ->
-//          --ha-dialog-surface-background, overlay background (scrim) ->
-//          --mdc-dialog-scrim-color. No variable found for min-width or
-//          box-shadow - those stay as plain values.
-
-// ─── Version History ────────────────────────────────────────────────────
+// v0.1.40: Modified default padding for sections views
 // v0.1.35: Popup now anchors from the top instead of centering vertically
 //          - .overlay's align-items: center (hardcoded) -> alignItems:
 //          'flex-start' (DEFAULT_OVERLAY_STYLES, overridable). Added
 //          DEFAULT_FRAME_STYLES.marginTop: '10vh' - relative like a
 //          percentage, but physically can't push the popup off-screen
 //          the way a negative margin-top from center could.
-
-// ─── Version History ────────────────────────────────────────────────────
 // v0.1.34: Added validation for styles.target values in open(); logs a
 //          warning when a styles target exists but is not an object. Also
 //          added a warning when the supplied view path contains extra
@@ -251,19 +239,19 @@ const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
 const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
 
 const DEFAULT_OVERLAY_STYLES = {
-  background: 'var(--mdc-dialog-scrim-color, rgba(0, 0, 0, 0.6))',
+  background: 'rgba(0, 0, 0, 0.6)',
   alignItems: 'flex-start',
 };
 
 const DEFAULT_FRAME_STYLES = {
   width:        'auto',
-  minWidth:     '540px',
-  maxWidth:     'var(--mdc-dialog-max-width, 90vw)',
+  minWidth:     '480px',
+  maxWidth:     '90vw',
   height:       'auto',
-  minHeight:    'var(--mdc-dialog-min-height, 10%)',
-  maxHeight:    'var(--mdc-dialog-max-height, 90vh)',
-  marginTop:    'var(--dialog-surface-margin-top, max(40px, var(--safe-area-inset-top, 0px)))',
-  background:   'var(--ha-dialog-surface-background, var(--card-background-color, #1c1c1c))',
+  minHeight:    '10%',
+  maxHeight:    '90vh',
+  marginTop:    '10vh',
+  background:   'var(--card-background-color, #1c1c1c)',
   borderRadius: 'var(--ha-dialog-border-radius, 28px)',
   boxShadow:    '0 8px 32px rgba(0, 0, 0, 0.5)',
 };
@@ -308,7 +296,7 @@ const DEFAULT_BODY_STYLES = {
 // DEFAULT_LAYOUT_PADDING.
 const DEFAULT_LAYOUT_PADDING = '0px 0px 12px 0px';
 const PANEL_LAYOUT_PADDING = '4px 24px 24px 24px';
-const SECTIONS_LAYOUT_PADDING = '0px 0px 0px 0px';
+const SECTIONS_LAYOUT_PADDING = '0px 24px 0px 24px';
 const MASONRY_LAYOUT_PADDING = '0px 0px 12px 0px';
 const SIDEBAR_LAYOUT_PADDING = '0px 0px 0px 0px';
 
