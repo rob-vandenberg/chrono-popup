@@ -64,9 +64,16 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.41';
+const CARD_VERSION = '1.2.42';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.42: Fixed close button getting visually covered by body content
+//          (e.g. thermostat card's dial) when the header is collapsed -
+//          .close-button and .body are both position:relative/absolute
+//          with z-index:auto, which stacks by DOM order, and .body comes
+//          after .close-button in markup. Added explicit z-index: 999 to
+//          .close-button so it always paints above body content,
+//          regardless of what's rendered inside the view.
 // v1.2.41: Added close-align (left/right/hidden, default left) and
 //          title-align (left/right/center/hidden, default left) data
 //          options. Close button moved out of .header entirely - now
@@ -319,7 +326,7 @@ const DEFAULT_BODY_STYLES = {
 // DEFAULT_LAYOUT_PADDING.
 const DEFAULT_LAYOUT_PADDING = '0px 0px 12px 0px';
 const PANEL_LAYOUT_PADDING = '4px 24px 24px 24px';
-const SECTIONS_LAYOUT_PADDING = '0px 24px 0px 24px';
+const SECTIONS_LAYOUT_PADDING = '0px 0px 0px 0px';
 const MASONRY_LAYOUT_PADDING = '0px 0px 12px 0px';
 const SIDEBAR_LAYOUT_PADDING = '0px 0px 0px 0px';
 
@@ -694,6 +701,7 @@ class ChronoPopupHost extends LitElement {
               style=${styleMap({
                 ...DEFAULT_CLOSE_BUTTON_STYLES,
                 position: 'absolute',
+                zIndex: '999',
                 top: CLOSE_BUTTON_INSET_TOP,
                 ...(closeAlign === 'right' ? { right: CLOSE_BUTTON_INSET_SIDE } : { left: CLOSE_BUTTON_INSET_SIDE }),
                 ...styles['close-button'],
