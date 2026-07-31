@@ -3,7 +3,7 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-1.2.42-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/badge/Version-1.2.45-brightgreen.svg?style=for-the-badge)](#)
 
   <img src="art/header.svg" width="780" alt="Chrono Popup Banner">
 
@@ -116,7 +116,7 @@ Chrono Popup is a resource, not a card - there's nothing to add to a dashboard a
 
 ---
 
-<img src="art/popup-example.png" width="800" alt="Chrono Popup showing a subview">
+<img src="art/popup-example.png" alt="Chrono Popup showing a subview">
 
 ---
 
