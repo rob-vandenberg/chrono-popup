@@ -64,9 +64,23 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.44';
+const CARD_VERSION = '1.2.45';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.45: Decoupled the header's total height from the button/title
+//          alignment point - v1.2.43's symmetric min-height approach
+//          forced both to be the same number, which couldn't express
+//          "move the button/title down 3px AND bring the header 6px
+//          closer to the body" (a net header total of 50px, down from
+//          56px) as two independent adjustments. Close button top
+//          inset: 16px -> 19px. Header vertical padding is now solved
+//          from BUTTON_CENTER_OFFSET_PX (button's own alignment point)
+//          and HEADER_TOTAL_HEIGHT_PX (50px) as two separate knobs,
+//          instead of one shared value - padding-top 0 -> 12px,
+//          padding-bottom stays 0px. Title still centers exactly on
+//          the button regardless of header height, and the header
+//          total can now be tuned on its own without moving the
+//          button/title.
 // v1.2.44: Fixed header side padding being reserved on BOTH sides for
 //          every close-align/title-align combination - that was only
 //          ever meant to apply to title-align: center. Replaced the
@@ -335,12 +349,11 @@ const DEFAULT_TITLE_STYLES = {
 };
 
 // Close button footprint, used both to size/position the button itself
-// (absolute against .frame) and to derive HEADER_MIN_HEIGHT below, so
-// the title's vertical center can never drift out of sync with the
-// button's - see the fuller explanation further down where the rest
-// of the close-button constants are defined.
+// (absolute against .frame) and, together with the header padding
+// constants below, to keep the button and title vertically aligned
+// while letting the header's total height be tuned independently.
 const CLOSE_BUTTON_SIZE_PX = 24;
-const CLOSE_BUTTON_INSET_TOP_PX = 16;
+const CLOSE_BUTTON_INSET_TOP_PX = 19;
 
 const DEFAULT_CLOSE_BUTTON_STYLES = {
   background:   'none',
@@ -396,11 +409,7 @@ const TITLE_ALIGN_JUSTIFY_CONTENT = {
 // padding so title text never runs underneath it.
 //
 // CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX are declared earlier,
-// alongside DEFAULT_CLOSE_BUTTON_STYLES. HEADER_MIN_HEIGHT below is
-// derived from those same numeric constants rather than being a second,
-// independently-chosen number that can drift out of sync with the
-// button's actual position - that drift is what caused the title to
-// render below the button's vertical center (fixed in v1.2.43).
+// alongside DEFAULT_CLOSE_BUTTON_STYLES.
 const CLOSE_BUTTON_INSET_SIDE_PX = 20;
 const CLOSE_BUTTON_INSET_TOP = `${CLOSE_BUTTON_INSET_TOP_PX}px`;
 const CLOSE_BUTTON_INSET_SIDE = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
@@ -417,6 +426,25 @@ const HEADER_SIDE_RESERVED = `${HEADER_SIDE_RESERVED_PX}px`;
 const HEADER_SIDE_NORMAL = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
 
 const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
+
+// Vertical geometry, button-shown case. Two independent knobs:
+//  - HEADER_TOTAL_HEIGHT_PX: how tall the header box is overall (and
+//    therefore how far the body sits below the button/title).
+//  - BUTTON_CENTER_OFFSET_PX: where the button's (and therefore the
+//    title's) vertical center sits, from the frame top - fixed to the
+//    button's own inset + half its height, so the two can never drift
+//    apart (this is what v1.2.43 fixed).
+// HEADER_PADDING_BOTTOM_PX is a free choice (0, i.e. the header's
+// bottom edge sits as close to the button/title's own center as the
+// alignment math allows); HEADER_PADDING_TOP_PX is solved from the
+// other three so align-items: center places the title's own vertical
+// center exactly on BUTTON_CENTER_OFFSET_PX, regardless of the
+// header's total height - the two are independently tunable by
+// design, not coincidentally matched.
+const HEADER_TOTAL_HEIGHT_PX = 50;
+const BUTTON_CENTER_OFFSET_PX = CLOSE_BUTTON_INSET_TOP_PX + CLOSE_BUTTON_SIZE_PX / 2;
+const HEADER_PADDING_BOTTOM_PX = 0;
+const HEADER_PADDING_TOP_PX = (2 * BUTTON_CENTER_OFFSET_PX) - HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX;
 
 // Reserves header side padding only where the button actually needs
 // it - never both sides just because a button exists:
@@ -444,16 +472,10 @@ function computeHeaderPadding(titleAlign, closeAlign) {
     }
   }
 
-  return `0px ${right} 0px ${left}`;
+  return `${HEADER_PADDING_TOP_PX}px ${right} ${HEADER_PADDING_BOTTOM_PX}px ${left}`;
 }
 
-// Guarantees the title's vertical center (centered via .header's
-// align-items: center) always equals the close button's vertical
-// center (CLOSE_BUTTON_INSET_TOP + half its height), by construction,
-// derived from the same numeric constants rather than matched by a
-// separately-chosen padding value.
-const HEADER_MIN_HEIGHT_PX = CLOSE_BUTTON_INSET_TOP_PX * 2 + CLOSE_BUTTON_SIZE_PX;
-const HEADER_MIN_HEIGHT = `${HEADER_MIN_HEIGHT_PX}px`;
+const HEADER_MIN_HEIGHT = `${HEADER_TOTAL_HEIGHT_PX}px`;
 
 // Validates a close-align/title-align value against its allowed list.
 // Missing value -> default, silently. Present but invalid -> default,
