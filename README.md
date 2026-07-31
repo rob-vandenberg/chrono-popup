@@ -116,7 +116,7 @@ Chrono Popup is a resource, not a card - there's nothing to add to a dashboard a
 
 ---
 
-<img src="art/popup-example.png" width="800" alt="Chrono Popup showing a subview">
+<img src="art/popup-example.png" alt="Chrono Popup showing a subview">
 
 ---
 
