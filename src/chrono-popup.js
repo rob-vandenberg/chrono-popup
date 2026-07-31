@@ -50,16 +50,39 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // required in v1 - the default (unnamed) dashboard is not yet supported,
 // only dashboards with an explicit url_path.
 //
-// Recognized top-level keys: title, view, styles, dismissable. Anything
-// else is not read - console.warn()'d instead of failing silently.
+// Recognized top-level keys: title, view, styles, dismissable,
+// close-align, title-align. Anything else is not read -
+// console.warn()'d instead of failing silently.
+//
+// close-align: "left" (default) | "right" | "hidden" - position of the
+// close button, or hide it entirely. Always takes zero vertical space.
+// title-align: "left" (default) | "right" | "center" | "hidden" - only
+// title-holding element that takes vertical space; "hidden" collapses
+// the header to zero height even if title text is set.
 // styles: is nested by target - see STYLE_TARGETS below for the full
 // list of elements that can be styled (overlay, frame, header, title,
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '0.1.40';
+const CARD_VERSION = '1.2.41';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.41: Added close-align (left/right/hidden, default left) and
+//          title-align (left/right/center/hidden, default left) data
+//          options. Close button moved out of .header entirely - now
+//          rendered independently, absolutely positioned against
+//          .frame, so it no longer takes vertical space and is never
+//          affected by whether a title is present. .header itself now
+//          renders only when title is non-empty AND title-align !==
+//          'hidden' - collapses to zero height otherwise. When the
+//          close button is shown, .header reserves symmetric padding
+//          on BOTH sides for its footprint (not just the occupied
+//          side), so title-align: center/right and close-align: left
+//          combinations never need overlap-specific math - ellipsis
+//          truncation stays correct regardless of which side the
+//          button is on. .frame given static position:relative (kept
+//          out of styles.frame so a user override can't break the
+//          button's positioning).
 // v0.1.40: Modified default padding for sections views
 // v0.1.35: Popup now anchors from the top instead of centering vertically
 //          - .overlay's align-items: center (hardcoded) -> alignItems:
@@ -233,7 +256,7 @@ console.info(
 
 const EVENT_KEY = 'chrono-popup';
 
-const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable'];
+const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable', 'close-align', 'title-align'];
 
 // Valid sub-keys under styles: - one per distinct element in the template.
 const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
@@ -311,6 +334,45 @@ const DEFAULT_STATUS_STYLES = {
   padding: '24px',
 };
 
+// Valid values for close-align / title-align, each defaulting to
+// "left". Invalid supplied values fall back to "left" via
+// resolveAlignOption() below, with a console.warn().
+const CLOSE_ALIGN_VALUES = ['left', 'right', 'hidden'];
+const TITLE_ALIGN_VALUES = ['left', 'right', 'center', 'hidden'];
+
+const TITLE_ALIGN_JUSTIFY_CONTENT = {
+  left: 'flex-start',
+  right: 'flex-end',
+  center: 'center',
+};
+
+// Close button footprint, used both to position the button itself
+// (absolute against .frame) and to size .header's reserved side
+// padding so title text never runs underneath it, regardless of
+// close-align or title-align.
+const CLOSE_BUTTON_INSET_TOP = '16px';
+const CLOSE_BUTTON_INSET_SIDE = '20px';
+
+// .header padding: symmetric on both sides whenever the close button
+// is shown (footprint reserved on BOTH sides, not just the occupied
+// one - avoids needing separate math per close-align/title-align
+// combination), or normal edge padding when the button is hidden.
+const HEADER_PADDING_BUTTON_RESERVED = '20px 60px 12px 60px';
+const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
+
+// Validates a close-align/title-align value against its allowed list.
+// Missing value -> default, silently. Present but invalid -> default,
+// with a console.warn() naming the bad value and the valid options.
+function resolveAlignOption(rawValue, validValues, fieldName) {
+  const DEFAULT_ALIGN = 'left';
+  if (rawValue == null) return DEFAULT_ALIGN;
+  if (validValues.includes(rawValue)) return rawValue;
+  console.warn(
+    `chrono-popup: invalid ${fieldName} "${rawValue}". Valid values: ${validValues.join(', ')}. Falling back to "${DEFAULT_ALIGN}".`
+  );
+  return DEFAULT_ALIGN;
+}
+
 // Locates ha-panel-lovelace's own shadow root - the scoped custom element
 // registry boundary the whole real Lovelace tree (hui-view, hui-section,
 // hui-card, and every card/control inside them) is built within. HA's
@@ -340,7 +402,7 @@ class ChronoPopupHost extends LitElement {
     _open:    { state: true },
     _loading: { state: true },
     _error:   { state: true },
-    _opts:    { state: true }, // { title, dismissable, styles } - width/height/background/radius are fixed defaults, override only via styles
+    _opts:    { state: true }, // { title, dismissable, closeAlign, titleAlign, styles } - width/height/background/radius are fixed defaults, override only via styles
     _view:    { state: true }, // { lovelace, index, viewConfig } for <hui-view>, once resolved
   };
 
@@ -452,6 +514,8 @@ class ChronoPopupHost extends LitElement {
     this._opts = {
       title: data.title ?? '',
       dismissable: data.dismissable !== false, // backdrop-click-to-close, on by default
+      closeAlign: resolveAlignOption(data['close-align'], CLOSE_ALIGN_VALUES, 'close-align'),
+      titleAlign: resolveAlignOption(data['title-align'], TITLE_ALIGN_VALUES, 'title-align'),
       styles,
     };
     this._error = null;
@@ -560,6 +624,7 @@ class ChronoPopupHost extends LitElement {
       justify-content: center;
     }
     .frame {
+      position: relative;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -606,7 +671,10 @@ class ChronoPopupHost extends LitElement {
   render() {
     if (!this._open) return html``;
 
-    const { title, dismissable, styles } = this._opts;
+    const { title, dismissable, styles, closeAlign, titleAlign } = this._opts;
+    const showCloseButton = closeAlign !== 'hidden';
+    const showHeader = !!title && titleAlign !== 'hidden';
+    const headerPadding = showCloseButton ? HEADER_PADDING_BUTTON_RESERVED : HEADER_PADDING_NO_BUTTON;
 
     return html`
       <div
@@ -620,10 +688,16 @@ class ChronoPopupHost extends LitElement {
           class="frame"
           style=${styleMap({ ...DEFAULT_FRAME_STYLES, ...styles.frame })}
         >
-          <div class="header" style=${styleMap({ ...DEFAULT_HEADER_STYLES, ...styles.header })}>
+          ${showCloseButton ? html`
             <button
               class="close-button"
-              style=${styleMap({ ...DEFAULT_CLOSE_BUTTON_STYLES, ...styles['close-button'] })}
+              style=${styleMap({
+                ...DEFAULT_CLOSE_BUTTON_STYLES,
+                position: 'absolute',
+                top: CLOSE_BUTTON_INSET_TOP,
+                ...(closeAlign === 'right' ? { right: CLOSE_BUTTON_INSET_SIDE } : { left: CLOSE_BUTTON_INSET_SIDE }),
+                ...styles['close-button'],
+              })}
               @click=${() => this.close()}
               aria-label="Close"
             >
@@ -631,8 +705,17 @@ class ChronoPopupHost extends LitElement {
                 <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
               </svg>
             </button>
-            <span class="title" style=${styleMap({ ...DEFAULT_TITLE_STYLES, ...styles.title })}>${title}</span>
-          </div>
+          ` : ''}
+          ${showHeader ? html`
+            <div class="header" style=${styleMap({
+              ...DEFAULT_HEADER_STYLES,
+              padding: headerPadding,
+              justifyContent: TITLE_ALIGN_JUSTIFY_CONTENT[titleAlign] ?? 'flex-start',
+              ...styles.header,
+            })}>
+              <span class="title" style=${styleMap({ ...DEFAULT_TITLE_STYLES, ...styles.title })}>${title}</span>
+            </div>
+          ` : ''}
           <div class="body" style=${styleMap({
             ...DEFAULT_BODY_STYLES,
             padding: LAYOUT_PADDING_BY_TYPE[this._view?.viewConfig?.type] ?? DEFAULT_LAYOUT_PADDING,

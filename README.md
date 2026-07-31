@@ -3,7 +3,7 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-0.1.25-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/badge/Version-1.2.41-brightgreen.svg?style=for-the-badge)](#)
 
   <img src="art/header.svg" width="780" alt="Chrono Popup Banner">
 
@@ -11,8 +11,8 @@
 
   <p align="center">
     <strong>Show any Home Assistant dashboard view as a popup.<br>
-            Design the popup visually in the normal dashboard editor -<br>
-            no layout-card, no grid-area YAML, no browser_mod dependency.</strong>
+            Design it visually, in the normal dashboard editor.<br>
+            No custom layout code needed.</strong>
   </p>
 
   <p align="center">
@@ -27,9 +27,9 @@
 
 ---
 
-**Chrono Popup** fills a gap browser_mod's popup feature doesn't cover: showing an entire dashboard **view** - built visually, with HA's own dashboard editor - inside a popup. Instead of hand-assembling `layout-card`, `conditional`, and `grid-area` YAML to fake a custom popup layout, you design a normal subview the way you'd design any other page, then point the popup at it.
+**Chrono Popup** shows a dashboard **view** as a popup. You build the view visually, using HA's own dashboard editor - the same way you'd build any other page. Then you point the popup at it.
 
-Chrono Popup is **not a card**. There's no `type: custom:chrono-popup` you place on a dashboard, no visual editor, and it won't appear in the "+ Add Card" picker. It's a resource: once loaded, any `tap_action` anywhere - a button, a tile, any card at all - can open the popup by firing a small event. Nothing to place, nothing to configure ahead of time; every popup is defined at the moment it's triggered.
+Chrono Popup is not a card. You don't add it to a dashboard, and it won't show up in the card picker. It's a resource: a small file that runs in the background. Once it's installed, any card can open a popup using its tap action.
 
 ---
 
@@ -42,10 +42,10 @@ Chrono Popup is **not a card**. There's no `type: custom:chrono-popup` you place
   - [Manual Installation](#manual-installation)
 - [Uninstallation](#uninstallation)
 - [Usage](#usage)
-  - [Trigger Syntax](#trigger-syntax)
-  - [Recognized Keys](#recognized-keys)
-  - [The `view` Path](#the-view-path)
-  - [Styling](#styling)
+  - [Opening a Popup](#opening-a-popup)
+  - [Options](#options)
+  - [Finding the view Path](#finding-the-view-path)
+  - [Styling the Popup](#styling-the-popup)
 - [Limitations](#limitations)
 - [License](#license)
 - [Support](#support)
@@ -55,25 +55,25 @@ Chrono Popup is **not a card**. There's no `type: custom:chrono-popup` you place
 ## 🚀 Key Features
 
 ### 🖼️ Design Popups Visually
-The popup's content is a real dashboard view, built in HA's own visual editor - not hand-written YAML fighting `layout-card` and `grid-template-areas` to fake a layout. If you can build it as a view, you can show it as a popup.
+Build the popup's content as a normal view, using HA's own editor. No layout code needed.
 
 ### 🧩 Any View Type
-Panel, masonry, sections, sidebar - all rendered through Home Assistant's own view layout element, not reimplemented from scratch. Whatever layout the view uses on a normal dashboard is exactly what renders inside the popup.
+Works with every view type: panel, masonry, sections, and sidebar. Whatever layout the view uses normally is what you'll see in the popup.
 
 ### 🔄 Genuinely Live
-Conditional cards, template sensors, anything that depends on live state - all update in real time while the popup is open, the same as they would on a normal dashboard page.
+Cards inside the popup update live, the same as they would on a normal dashboard page.
 
 ### 📐 Auto-Sizing by Default
-The popup sizes itself to fit its content automatically, with sensible min/max caps so it never overflows the screen. No need to calculate pixel dimensions up front.
+The popup sizes itself to fit its content. You don't need to set a width or height unless you want to.
 
-### 🎨 One Escape Hatch for All Styling
-Every visual property - size, background, border, radius, anything - is set through a single `styles:` block using real CSS property names, including CSS custom properties. No separate named fields to remember, no guessing which property lives where.
+### 🎨 One Place for All Styling
+Change how the popup looks - size, color, spacing - using a single `styles:` block with normal CSS. You can also choose where the close button and title go, or hide either one.
 
-### 🚫 Zero Dependencies
-No browser_mod required. Chrono Popup handles its own trigger mechanism, its own popup chrome, and its own view resolution independently.
+### 🚫 Nothing Else to Install
+Chrono Popup handles everything itself: opening the popup, showing it, and loading the view. Nothing else needs to be installed.
 
 ### 🔒 Respects View Visibility
-If a view is restricted to specific users in the dashboard editor, that restriction is respected here too - a view hidden from a user stays hidden inside the popup.
+If a view is hidden from a user in the dashboard editor, it stays hidden in the popup too.
 
 ---
 
@@ -89,7 +89,7 @@ If a view is restricted to specific users in the dashboard editor, that restrict
 6. Search for `Chrono Popup` and click **Download**.
 7. Reload your browser.
 
-Chrono Popup is a resource, not a card - there's no card to add to a dashboard afterward. Once the resource is loaded, it's ready to be triggered from any `tap_action`.
+Chrono Popup is a resource, not a card - there's nothing to add to a dashboard afterward. Once it's loaded, any card's tap action can open a popup.
 
 ### Manual Installation
 
@@ -122,93 +122,119 @@ Chrono Popup is a resource, not a card - there's no card to add to a dashboard a
 
 ## ⚙️ Usage
 
-### Trigger Syntax
+### Opening a Popup
 
-Any card's `tap_action` can open a popup via `fire-dom-event`:
+Add a `tap_action` to any card. Set the action to `fire-dom-event`, then add a `chrono-popup` block with your settings inside `data`.
+
+The simplest possible example:
 
 ```yaml
 tap_action:
   action: fire-dom-event
   chrono-popup:
     data:
-      title: "Hello, world!"
-      view: "/dashboard-test/uren-panel"
+      view: "/dashboard-popup/thermostat"
+```
+
+This opens the view at `/dashboard-popup/thermostat` as a popup. Nothing else is required.
+
+Here's a fuller example, using more of the available options:
+
+```yaml
+tap_action:
+  action: fire-dom-event
+  chrono-popup:
+    data:
+      title: "Thermostat"
+      view: "/dashboard-popup/thermostat"
       dismissable: true
+      close-align: right
+      title-align: center
       styles:
         frame:
           width: 640px
           height: 580px
           background: "#000000"
           border-radius: 50px
-        header:
-          padding: 8px 8px 0 8px
 ```
 
-### Recognized Keys
+### Options
 
-| Key | Type | Default | Description |
+These go under `data:`.
+
+| Key | Type | Default | What it does |
 | :--- | :--- | :--- | :--- |
-| `title` | string | `''` | Text shown in the popup's header bar |
-| `view` | string | *required* | The view to display - see [The `view` Path](#the-view-path) below |
-| `styles` | object | `{}` | Per-element CSS, nested by target - see [Styling](#styling) below |
-| `dismissable` | boolean | `true` | Whether clicking outside the popup closes it. When `false`, only the close button works. |
+| `title` | text | (none) | Text shown at the top of the popup. Leave it out and the header disappears. |
+| `view` | text | required | Which view to show. See [Finding the view Path](#finding-the-view-path) below. |
+| `dismissable` | `true`/`false` | `true` | If `true`, clicking outside the popup closes it. |
+| `close-align` | text | `left` | Where the close button sits: `left`, `right`, or `hidden`. |
+| `title-align` | text | `left` | Where the title sits: `left`, `right`, `center`, or `hidden`. |
+| `styles` | settings | (none) | Changes how the popup looks. See [Styling the Popup](#styling-the-popup) below. |
 
-Any other key is not recognized and will not be applied. A `console.warn()` is logged naming the unrecognized key rather than failing silently.
+Using a key that isn't in this list, or a value that isn't valid, won't break the popup - it's just ignored, and a warning is written to the browser console.
 
-### The `view` Path
+### Finding the view Path
 
-`view` is `"/<dashboard url_path>/<view path>"` - both segments are required.
+Go to the dashboard page you want to show in the popup. Look at your browser's address bar.
+
+For example, if the address bar shows:
+
+```
+http://homeassistant.local:8123/dashboard-popup/thermostat
+```
+
+Then everything after your Home Assistant address is the view path:
 
 ```yaml
-view: "/dashboard-subviews/oprit-announcements"
+view: "/dashboard-popup/thermostat"
 ```
 
-- `dashboard-subviews` is the dashboard's `url_path` - the segment in the browser's address bar, not its display title.
-- `oprit-announcements` is the view's `path`, set in the view's own settings in the dashboard editor.
+The default (unnamed) dashboard doesn't have a path, so it isn't supported. Your dashboard needs its own path first.
 
-The default (unnamed) dashboard is not currently supported - only dashboards with an explicit `url_path`.
+### Styling the Popup
 
-### Styling
+Use `styles:` to change how the popup looks - size, color, spacing, anything CSS can do.
 
-`styles:` is nested by target - one optional sub-key per distinct element in the popup, each accepting any real CSS property name:
-
-| Target | Element |
-| :--- | :--- |
-| `overlay` | The full-screen backdrop behind the popup |
-| `frame` | The popup window itself (size, background, border-radius) |
-| `header` | The title bar |
-| `title` | The title text |
-| `close-button` | The close button |
-| `body` | The content area where the subview renders |
-| `status` | Loading/error text shown inside the body |
+A simple example:
 
 ```yaml
 styles:
   frame:
-    width: auto
-    min-width: 580px
-    max-width: 90vw
-    height: auto
-    min-height: 533px
-    max-height: 90vh
-    background: var(--card-background-color, #1c1c1c)
-    border-radius: var(--ha-dialog-border-radius, 28px)
-  header:
-    padding: 8px 8px 0 8px
+    width: 600px
+    background: "#222222"
+  title:
+    color: "#ffffff"
+    font-size: 1.5rem
 ```
 
-Every target has its own built-in defaults, applied automatically when omitted. Any property set under a target overrides the matching default. Two things can't be reached this way: the close button's hover effect (a `:hover` state, not expressible as a static override) and the error-message text color (kept separate so it doesn't get permanently overridden by a general status color).
+This makes the popup 600px wide with a dark background, and the title bigger and white.
 
-CSS custom properties (`--variable-name`) are supported on any target, and are the one styling mechanism that can reach into the view's own cards, since custom properties inherit through the shadow DOM boundaries that ordinary selectors cannot cross. For styling individual cards inside the view directly, use [card-mod](https://github.com/thomasloven/lovelace-card-mod) on those cards in the subview itself - `styles:` here only ever reaches the seven targets above, never into the rendered subview's own content.
+`styles:` is split into targets - one for each part of the popup:
+
+| Target | What it changes |
+| :--- | :--- |
+| `overlay` | The dark background behind the popup |
+| `frame` | The popup window itself |
+| `header` | The bar at the top, when a title is shown |
+| `title` | The title text |
+| `close-button` | The close button |
+| `body` | The area where your view is shown |
+| `status` | The loading/error text, before the view loads |
+
+Every target already looks fine by default. You only need to set the properties you want to change.
+
+If there's no title (or `title-align: hidden`), the header disappears completely - it doesn't just look empty, it takes up no space at all. The close button doesn't depend on the header: it's always shown (unless you set `close-align: hidden`), and never takes up space of its own.
+
+CSS custom properties (like `--my-color`) work in `styles:` too, and are the only way to reach into the cards inside your view.
 
 ---
 
 ## ⚠️ Limitations
 
-- The default (unnamed) dashboard is not supported - only dashboards with an explicit `url_path`.
-- Only real Lovelace dashboards and views can be shown - generated panels (e.g. Music Assistant, the auto-generated Areas dashboard) and non-Lovelace integration panels are not supported.
-- Only one popup is shown at a time - triggering a new one while another is open replaces it.
-- Automations and scripts cannot trigger a popup directly - `fire-dom-event` requires a browser-side `tap_action`.
+- Only dashboards with their own path work. The default (unnamed) dashboard is not supported.
+- Only real Lovelace views work. Auto-generated panels, like Music Assistant or Areas, don't.
+- Only one popup shows at a time. Opening a new one closes the old one.
+- Automations and scripts can't open a popup directly. It has to come from a tap action in the browser.
 
 ---
 
