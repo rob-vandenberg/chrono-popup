@@ -3,14 +3,14 @@
 
   [![](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
   [![](https://img.shields.io/badge/License-AGPL_3.0-blue.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![](https://img.shields.io/badge/Version-1.2.45-brightgreen.svg?style=for-the-badge)](#)
+  [![](https://img.shields.io/github/v/release/rob-vandenberg/chrono-popup?style=for-the-badge&color=brightgreen&label=Version)](https://github.com/rob-vandenberg/chrono-popup/releases)
 
   <img src="art/header.svg" width="780" alt="Chrono Popup Banner">
 
   <img src="art/banner.png" width="800" alt="Chrono Popup in action">
 
   <p align="center">
-    <strong>Show any Home Assistant dashboard view as a popup.<br>
+    <strong>Show any Home Assistant dashboard view or subview as a popup.<br>
             Design it visually, in the normal dashboard editor.<br>
             No custom layout code needed.</strong>
   </p>
@@ -27,9 +27,9 @@
 
 ---
 
-**Chrono Popup** shows a dashboard **view** as a popup. You build the view visually, using HA's own dashboard editor - the same way you'd build any other page. Then you point the popup at it.
+**Chrono Popup** shows any dashboard **view** or **subview** as a popup. You build the view visually, using HA's own dashboard editor - the same way you'd build any other page. Then you point the popup at it.
 
-Chrono Popup is not a card. You don't add it to a dashboard, and it won't show up in the card picker. It's a resource: a small file that runs in the background. Once it's installed, any card can open a popup using its tap action.
+Chrono Popup is not a card. You don't add it to a dashboard, and it won't show up in the card picker. It is a resource: a small file that runs in the background. Once it's installed, any card can open a popup using any action, like tap_action or hold_action or double_tap_action. You can also test it from Settings > Tools > Actions.
 
 ---
 
@@ -254,4 +254,4 @@ Copyright © 2026 Rob Vandenberg. All rights reserved.
 
 If you find this project useful and wish to support its continued development, please consider a contribution.
 
-[![](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-yellow.svg?style=for-the-badge)](https://www.buymeacoffee.com/)
+[![](https://img.shields.io/badge/Buy_Me_A_Coffee-Support-yellow.svg?style=for-the-badge)](https://www.buymeacoffee.com/robvandenberg)

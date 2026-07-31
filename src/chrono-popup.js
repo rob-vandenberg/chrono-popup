@@ -64,9 +64,24 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.45';
+const CARD_VERSION = '1.2.46';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.46: Fixed title rendering ~6px below the close button again,
+//          for a different reason than v1.2.43. Root cause this time:
+//          the file sets no box-sizing anywhere, so the CSS default
+//          (content-box) applies - under content-box, min-height sizes
+//          the content area only, and padding is added ON TOP of it.
+//          v1.2.45 set the header's min-height directly to the desired
+//          TOTAL height (50px), which under content-box actually
+//          produced a real total of padding-top + 50 + padding-bottom
+//          (62px), and shifted the title's center down by the same
+//          gap. Added HEADER_CONTENT_BOX_HEIGHT_PX, solved separately
+//          from HEADER_TOTAL_HEIGHT_PX so that once padding is added
+//          on top of it, both the true total and the title's center
+//          come out correct. Also corrected close button top inset:
+//          19px -> 18px (v1.2.45 applied a 3px downshift; 2px was
+//          intended).
 // v1.2.45: Decoupled the header's total height from the button/title
 //          alignment point - v1.2.43's symmetric min-height approach
 //          forced both to be the same number, which couldn't express
@@ -353,7 +368,7 @@ const DEFAULT_TITLE_STYLES = {
 // constants below, to keep the button and title vertically aligned
 // while letting the header's total height be tuned independently.
 const CLOSE_BUTTON_SIZE_PX = 24;
-const CLOSE_BUTTON_INSET_TOP_PX = 19;
+const CLOSE_BUTTON_INSET_TOP_PX = 18;
 
 const DEFAULT_CLOSE_BUTTON_STYLES = {
   background:   'none',
@@ -436,15 +451,24 @@ const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
 //    apart (this is what v1.2.43 fixed).
 // HEADER_PADDING_BOTTOM_PX is a free choice (0, i.e. the header's
 // bottom edge sits as close to the button/title's own center as the
-// alignment math allows); HEADER_PADDING_TOP_PX is solved from the
-// other three so align-items: center places the title's own vertical
-// center exactly on BUTTON_CENTER_OFFSET_PX, regardless of the
-// header's total height - the two are independently tunable by
-// design, not coincidentally matched.
+// alignment math allows).
+//
+// IMPORTANT: this file sets no box-sizing anywhere, so the CSS default
+// (content-box) applies. Under content-box, min-height sizes the
+// CONTENT area only - padding is added ON TOP of it, not included in
+// it. v1.2.45 set min-height directly to HEADER_TOTAL_HEIGHT_PX, which
+// under content-box actually produced a real total of
+// padding-top + HEADER_TOTAL_HEIGHT_PX + padding-bottom (62px, not
+// 50px), and threw off the title's centering by the same amount
+// (fixed here in v1.2.46). HEADER_CONTENT_BOX_HEIGHT_PX is the correct
+// value for min-height - solved so that, once padding is added on top
+// of it, the title's center still lands on BUTTON_CENTER_OFFSET_PX and
+// the real total still equals HEADER_TOTAL_HEIGHT_PX.
 const HEADER_TOTAL_HEIGHT_PX = 50;
 const BUTTON_CENTER_OFFSET_PX = CLOSE_BUTTON_INSET_TOP_PX + CLOSE_BUTTON_SIZE_PX / 2;
 const HEADER_PADDING_BOTTOM_PX = 0;
-const HEADER_PADDING_TOP_PX = (2 * BUTTON_CENTER_OFFSET_PX) - HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX;
+const HEADER_CONTENT_BOX_HEIGHT_PX = 2 * (HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - BUTTON_CENTER_OFFSET_PX);
+const HEADER_PADDING_TOP_PX = HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - HEADER_CONTENT_BOX_HEIGHT_PX;
 
 // Reserves header side padding only where the button actually needs
 // it - never both sides just because a button exists:
@@ -475,7 +499,7 @@ function computeHeaderPadding(titleAlign, closeAlign) {
   return `${HEADER_PADDING_TOP_PX}px ${right} ${HEADER_PADDING_BOTTOM_PX}px ${left}`;
 }
 
-const HEADER_MIN_HEIGHT = `${HEADER_TOTAL_HEIGHT_PX}px`;
+const HEADER_MIN_HEIGHT = `${HEADER_CONTENT_BOX_HEIGHT_PX}px`;
 
 // Validates a close-align/title-align value against its allowed list.
 // Missing value -> default, silently. Present but invalid -> default,
