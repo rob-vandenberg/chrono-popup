@@ -64,9 +64,39 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.42';
+const CARD_VERSION = '1.2.44';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.44: Fixed header side padding being reserved on BOTH sides for
+//          every close-align/title-align combination - that was only
+//          ever meant to apply to title-align: center. Replaced the
+//          fixed HEADER_PADDING_BUTTON_RESERVED constant with
+//          computeHeaderPadding(), which reserves space only on the
+//          side the button actually occupies: both sides for center,
+//          one side when title and button share a side, neither side
+//          when they're on opposite edges (e.g. title-align: left +
+//          close-align: right now renders fully flush left, as
+//          intended). DEFAULT_TITLE_STYLES: fontSize 1.4rem -> 24px,
+//          fontWeight 500 -> 400.
+// v1.2.43: Fixed title rendering below the close button's vertical
+//          center when a title is shown. Cause: .header's old
+//          asymmetric padding (20px top / 12px bottom) was a leftover
+//          from the pre-1.2.41 design, when the button lived inside
+//          .header and the padding was shaped around it - once the
+//          button moved to independent absolute positioning, that
+//          padding kept its old shape but lost any relationship to
+//          where the button actually sits, so the two drifted apart.
+//          Fix: CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX
+//          extracted as shared numeric constants; HEADER_MIN_HEIGHT is
+//          now derived from them (2 * inset + size) rather than being
+//          a second, independently-chosen number. .header's vertical
+//          padding dropped to 0 (button-shown case) and given that
+//          min-height instead, so align-items: center places the
+//          title's vertical center at exactly the same point as the
+//          button's, by construction - not by coincidence, and it
+//          can't drift again even if button size/inset change later.
+//          Side effect (desired): header is shorter than before, since
+//          min-height (56px) is less than the old padding-driven total.
 // v1.2.42: Fixed close button getting visually covered by body content
 //          (e.g. thermostat card's dial) when the header is collapsed -
 //          .close-button and .body are both position:relative/absolute
@@ -293,10 +323,10 @@ const DEFAULT_HEADER_STYLES = {
 };
 
 const DEFAULT_TITLE_STYLES = {
-  fontSize:      '1.4rem',
+  fontSize:      '24px',
   lineHeight:    '2rem',
   letterSpacing: '0.0125em',
-  fontWeight:    '500',
+  fontWeight:    '400',
   color:         'var(--primary-text-color, #fff)',
   whiteSpace:    'nowrap',
   overflow:      'hidden',
@@ -304,12 +334,20 @@ const DEFAULT_TITLE_STYLES = {
   marginLeft:    '4px',
 };
 
+// Close button footprint, used both to size/position the button itself
+// (absolute against .frame) and to derive HEADER_MIN_HEIGHT below, so
+// the title's vertical center can never drift out of sync with the
+// button's - see the fuller explanation further down where the rest
+// of the close-button constants are defined.
+const CLOSE_BUTTON_SIZE_PX = 24;
+const CLOSE_BUTTON_INSET_TOP_PX = 16;
+
 const DEFAULT_CLOSE_BUTTON_STYLES = {
   background:   'none',
   border:       'none',
   color:        'var(--primary-text-color, #fff)',
-  width:        '24px',
-  height:       '24px',
+  width:        `${CLOSE_BUTTON_SIZE_PX}px`,
+  height:       `${CLOSE_BUTTON_SIZE_PX}px`,
   padding:      '0',
   borderRadius: '50%',
 };
@@ -355,17 +393,67 @@ const TITLE_ALIGN_JUSTIFY_CONTENT = {
 
 // Close button footprint, used both to position the button itself
 // (absolute against .frame) and to size .header's reserved side
-// padding so title text never runs underneath it, regardless of
-// close-align or title-align.
-const CLOSE_BUTTON_INSET_TOP = '16px';
-const CLOSE_BUTTON_INSET_SIDE = '20px';
+// padding so title text never runs underneath it.
+//
+// CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX are declared earlier,
+// alongside DEFAULT_CLOSE_BUTTON_STYLES. HEADER_MIN_HEIGHT below is
+// derived from those same numeric constants rather than being a second,
+// independently-chosen number that can drift out of sync with the
+// button's actual position - that drift is what caused the title to
+// render below the button's vertical center (fixed in v1.2.43).
+const CLOSE_BUTTON_INSET_SIDE_PX = 20;
+const CLOSE_BUTTON_INSET_TOP = `${CLOSE_BUTTON_INSET_TOP_PX}px`;
+const CLOSE_BUTTON_INSET_SIDE = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
 
-// .header padding: symmetric on both sides whenever the close button
-// is shown (footprint reserved on BOTH sides, not just the occupied
-// one - avoids needing separate math per close-align/title-align
-// combination), or normal edge padding when the button is hidden.
-const HEADER_PADDING_BUTTON_RESERVED = '20px 60px 12px 60px';
+// Reserved-side header padding = the button's own side inset + its
+// width + a small gap so the title's ellipsis doesn't run flush
+// against it. Normal-side padding = just the side inset, same value
+// used for the button-hidden case, kept as a separate constant so the
+// two meanings (reserved vs. normal) don't accidentally end up as the
+// same literal by coincidence.
+const HEADER_TITLE_BUTTON_GAP_PX = 16;
+const HEADER_SIDE_RESERVED_PX = CLOSE_BUTTON_INSET_SIDE_PX + CLOSE_BUTTON_SIZE_PX + HEADER_TITLE_BUTTON_GAP_PX;
+const HEADER_SIDE_RESERVED = `${HEADER_SIDE_RESERVED_PX}px`;
+const HEADER_SIDE_NORMAL = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
+
 const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
+
+// Reserves header side padding only where the button actually needs
+// it - never both sides just because a button exists:
+//  - title-align: center -> both sides reserved (the title's own box
+//    is centered on the frame width per align-items regardless of
+//    which side has more/less space, so reserving both sides keeps
+//    that centering symmetric without separate frame-width math)
+//  - title on the SAME side as the button -> that side reserved only
+//  - title on the OPPOSITE side from the button -> no reservation;
+//    the title and button are on opposite edges and can't overlap
+// Only called when the close button is shown - closeAlign is
+// therefore always 'left' or 'right' here, never 'hidden'.
+function computeHeaderPadding(titleAlign, closeAlign) {
+  let left = HEADER_SIDE_NORMAL;
+  let right = HEADER_SIDE_NORMAL;
+
+  if (titleAlign === 'center') {
+    left = HEADER_SIDE_RESERVED;
+    right = HEADER_SIDE_RESERVED;
+  } else if (titleAlign === closeAlign) {
+    if (closeAlign === 'left') {
+      left = HEADER_SIDE_RESERVED;
+    } else {
+      right = HEADER_SIDE_RESERVED;
+    }
+  }
+
+  return `0px ${right} 0px ${left}`;
+}
+
+// Guarantees the title's vertical center (centered via .header's
+// align-items: center) always equals the close button's vertical
+// center (CLOSE_BUTTON_INSET_TOP + half its height), by construction,
+// derived from the same numeric constants rather than matched by a
+// separately-chosen padding value.
+const HEADER_MIN_HEIGHT_PX = CLOSE_BUTTON_INSET_TOP_PX * 2 + CLOSE_BUTTON_SIZE_PX;
+const HEADER_MIN_HEIGHT = `${HEADER_MIN_HEIGHT_PX}px`;
 
 // Validates a close-align/title-align value against its allowed list.
 // Missing value -> default, silently. Present but invalid -> default,
@@ -681,7 +769,8 @@ class ChronoPopupHost extends LitElement {
     const { title, dismissable, styles, closeAlign, titleAlign } = this._opts;
     const showCloseButton = closeAlign !== 'hidden';
     const showHeader = !!title && titleAlign !== 'hidden';
-    const headerPadding = showCloseButton ? HEADER_PADDING_BUTTON_RESERVED : HEADER_PADDING_NO_BUTTON;
+    const headerPadding = showCloseButton ? computeHeaderPadding(titleAlign, closeAlign) : HEADER_PADDING_NO_BUTTON;
+    const headerMinHeight = showCloseButton ? HEADER_MIN_HEIGHT : undefined;
 
     return html`
       <div
@@ -718,6 +807,7 @@ class ChronoPopupHost extends LitElement {
             <div class="header" style=${styleMap({
               ...DEFAULT_HEADER_STYLES,
               padding: headerPadding,
+              ...(headerMinHeight ? { minHeight: headerMinHeight } : {}),
               justifyContent: TITLE_ALIGN_JUSTIFY_CONTENT[titleAlign] ?? 'flex-start',
               ...styles.header,
             })}>
