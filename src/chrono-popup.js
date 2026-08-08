@@ -64,9 +64,13 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.46';
+const CARD_VERSION = '1.2.47';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.47: DEFAULT_FRAME_STYLES.minWidth: 480px -> 240px, to allow
+//          narrower popups on small/custom mobile themes without the
+//          old default forcing a wider frame than styles.frame.width
+//          requested.
 // v1.2.46: Fixed title rendering ~6px below the close button again,
 //          for a different reason than v1.2.43. Root cause this time:
 //          the file sets no box-sizing anywhere, so the CSS default
@@ -334,7 +338,7 @@ const DEFAULT_OVERLAY_STYLES = {
 
 const DEFAULT_FRAME_STYLES = {
   width:        'auto',
-  minWidth:     '480px',
+  minWidth:     '240px',
   maxWidth:     '90vw',
   height:       'auto',
   minHeight:    '10%',
