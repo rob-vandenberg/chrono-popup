@@ -64,9 +64,25 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // close-button, body, status). Each is optional.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.47';
+const CARD_VERSION = '1.2.48';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.2.48: Added hard-coded default padding for hui-sections-view's own
+//          internal .wrapper/.container elements (HA's, not ours - not
+//          reachable via styles:). Applied per-instance, scoped to just
+//          the sections view shown inside this popup - other sections
+//          views on the dashboard are untouched. Mechanism: locates the
+//          specific <hui-sections-view> instance via
+//          findElementInShadowTree() (crosses open shadow roots by tag
+//          name, not a fixed depth path, since HA's exact nesting isn't
+//          a stable public contract) and appends one reusable
+//          CSSStyleSheet to its shadowRoot.adoptedStyleSheets, matching
+//          the pattern already used in chrono-hvac-card /
+//          chrono-slider-card (single sheet, created once, appended
+//          not replaced, content set via replaceSync). No config option
+//          - hard default, not opt-in. Re-checked on every render and
+//          on every live entity update (both idempotent) so it
+//          self-heals if HA ever recreates the element.
 // v1.2.47: DEFAULT_FRAME_STYLES.minWidth: 480px -> 240px, to allow
 //          narrower popups on small/custom mobile themes without the
 //          old default forcing a wider frame than styles.frame.width
@@ -407,6 +423,70 @@ const LAYOUT_PADDING_BY_TYPE = {
   sidebar: SIDEBAR_LAYOUT_PADDING,
 };
 
+// .wrapper and .container below are HA's own elements, internal to
+// hui-sections-view (rendered when a "sections"-type view is shown) -
+// not ours, and not reachable via styles:. Their own padding is driven
+// by --ha-view-sections-column-gap / --ha-view-sections-row-gap, but
+// those same variables also control the grid's card-to-card gap, so
+// setting them just to fix padding would also shrink that gap as a
+// side effect. These two constants are injected directly into that
+// specific <hui-sections-view> instance's own shadow root instead (see
+// applySectionsDefaultCss below), scoped to just the view shown inside
+// this popup - other sections views elsewhere on the dashboard are
+// untouched.
+const SECTIONS_WRAPPER_PADDING = '0px 8px';
+const SECTIONS_CONTAINER_PADDING = '8px 0px';
+
+// Recursively searches a DOM/shadow tree for the first element with the
+// given tag name, crossing into any open shadow roots it encounters.
+// Used instead of a fixed shadowRoot.querySelector(...) chain because
+// the exact nesting depth between <hui-view> and view-type elements
+// like <hui-sections-view> is internal to HA and not guaranteed to
+// stay the same across frontend versions - this only assumes the tag
+// name and HA's convention of open shadow roots (both hold true today;
+// card-mod itself depends on the same convention).
+function findElementInShadowTree(root, tagName) {
+  if (!root) return null;
+  const upperTag = tagName.toUpperCase();
+  const queue = [root];
+  while (queue.length) {
+    const current = queue.shift();
+    const children = current.children ? Array.from(current.children) : [];
+    for (const child of children) {
+      if (child.tagName === upperTag) return child;
+      if (child.shadowRoot) queue.push(child.shadowRoot);
+      queue.push(child);
+    }
+  }
+  return null;
+}
+
+// Appends sheet to target's adoptedStyleSheets if not already present -
+// matches the reusable-CSSStyleSheet + append-not-replace pattern used
+// in chrono-hvac-card / chrono-slider-card, adapted for an externally
+// located shadow root rather than the component's own renderRoot. The
+// .includes() guard is needed here (unlike a one-time firstUpdated())
+// because this runs on every render/live-update cycle against a
+// dynamically-located element.
+function appendStyleSheetOnce(shadowRoot, sheet) {
+  if (!shadowRoot) return;
+  if (!shadowRoot.adoptedStyleSheets.includes(sheet)) {
+    shadowRoot.adoptedStyleSheets = [...shadowRoot.adoptedStyleSheets, sheet];
+  }
+}
+
+// Finds the <hui-sections-view> instance inside this popup (if the
+// current view resolved to type "sections") and applies
+// SECTIONS_WRAPPER_PADDING / SECTIONS_CONTAINER_PADDING to just that
+// instance. Safe to call repeatedly - appendStyleSheetOnce is a no-op
+// once already applied to a given shadow root.
+function applySectionsDefaultCss(hostRoot, sheet) {
+  const sectionsView = findElementInShadowTree(hostRoot, 'hui-sections-view');
+  if (sectionsView?.shadowRoot) {
+    appendStyleSheetOnce(sectionsView.shadowRoot, sheet);
+  }
+}
+
 const DEFAULT_STATUS_STYLES = {
   padding: '24px',
 };
@@ -560,6 +640,12 @@ class ChronoPopupHost extends LitElement {
     this._view = null;
     this._hassUnsub = null; // unsubscribe fn for the live entity-updates subscription, while a popup is open
     this._onKeydown = this._onKeydown.bind(this);
+
+    // Created once, content never changes - see applySectionsDefaultCss.
+    this._sectionsStyleSheet = new CSSStyleSheet();
+    this._sectionsStyleSheet.replaceSync(
+      `.wrapper { padding: ${SECTIONS_WRAPPER_PADDING}; }\n.container { padding: ${SECTIONS_CONTAINER_PADDING}; }`
+    );
   }
 
   connectedCallback() {
@@ -575,6 +661,16 @@ class ChronoPopupHost extends LitElement {
 
   _onKeydown(ev) {
     if (ev.key === 'Escape' && this._open) this.close();
+  }
+
+  // Runs after every render. Cheap and idempotent (appendStyleSheetOnce
+  // no-ops once already applied to a given shadow root) - covers the
+  // initial render, since _subscribeToUpdates's callback only fires on
+  // a later entity change, not immediately at open().
+  updated() {
+    if (this._open) {
+      applySectionsDefaultCss(this.renderRoot, this._sectionsStyleSheet);
+    }
   }
 
   // Singleton hass access. This element is not part of any dashboard's
@@ -609,6 +705,7 @@ class ChronoPopupHost extends LitElement {
       this._hassUnsub = await subscribeEntities(hass.connection, () => {
         const huiView = this.renderRoot?.querySelector('hui-view');
         if (huiView) huiView.hass = this._getHass();
+        applySectionsDefaultCss(this.renderRoot, this._sectionsStyleSheet);
       });
     } catch (err) {
       console.warn('chrono-popup: could not subscribe to entity updates - popup content will not update live', err);
