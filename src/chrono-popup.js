@@ -1,15 +1,22 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit@2.0.0/index.js?module';
 import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-websocket@9.6.0/dist/index.js';
 
-// chrono-popup.js - a JS resource (not a card): registers a singleton
-// overlay host + document "ll-custom" listener, so any tap_action
-// (fire-dom-event, key "chrono-popup") can show an HA dashboard view or
-// subview as a popup via <hui-view>. Data keys: title, view
-// ("/dashboard/view"), styles (per-target CSS, "host" -> :host, no
-// allowlist), dismissable, close-align, title-align.
+// Chrono Popup is a Home Assistant resource (not a dashboard card) that
+// lets you show any dashboard view or subview inside a popup window. You
+// open it by attaching a fire-dom-event action to something like
+// tap_action, pointing it at the view you want to show. This way you can
+// design your popups visually, using the normal Home Assistant dashboard
+// editor, instead of writing custom popup layout YAML by hand. Example:
+// 
+//  tap_action:
+//    action: fire-dom-event
+//    chrono-popup:
+//      data:
+//        title: Living room
+//        view: /dashboard-popups/thermostat
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.3.54';
+const CARD_VERSION = '1.3.55';
 
 // ─── Version History ────────────────────────────────────────────────────
 // v1.3.54: Comment-only pass - condensed the intro block and every version-history entry to one line each; no code/logic changes.
