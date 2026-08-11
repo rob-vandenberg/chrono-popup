@@ -67,7 +67,7 @@ Cards inside the popup update live, the same as they would on a normal dashboard
 The popup sizes itself to fit its content. You don't need to set a width or height unless you want to.
 
 ### 🎨 One Place for All Styling
-Change how the popup looks - size, color, spacing - using a single `styles:` block with normal CSS. You can also choose where the close button and title go, or hide either one.
+Change how the popup looks - size, color, spacing - using a single `styles:` block with normal CSS. A handful of built-in CSS variables also let you change one thing - like the popup's corner rounding - and have it apply consistently, in a single edit. You can also choose where the close button and title go, or hide either one.
 
 ### 🚫 Nothing Else to Install
 Chrono Popup handles everything itself: opening the popup, showing it, and loading the view. Nothing else needs to be installed.
@@ -221,11 +221,68 @@ This makes the popup 600px wide with a dark background, and the title bigger and
 | `body` | The area where your view is shown |
 | `status` | The loading/error text, before the view loads |
 
+One target is special: `host` targets the popup's own outer element, not a part inside it.
+
 Every target already looks fine by default. You only need to set the properties you want to change.
 
 If there's no title (or `title-align: hidden`), the header disappears completely - it doesn't just look empty, it takes up no space at all. The close button doesn't depend on the header: it's always shown (unless you set `close-align: hidden`), and never takes up space of its own.
 
+There's no validation on `styles:` - any target name and any CSS property is accepted and applied exactly as written, even if it doesn't match anything on the popup. This gives you full control, but also means a typo in a property name will silently do nothing. A warning is written to the browser console only if a target's settings aren't written as a proper block (for example, a plain value where a list of properties was expected).
+
 CSS custom properties (like `--my-color`) work in `styles:` too, and are the only way to reach into the cards inside your view.
+
+#### Built-in CSS variables
+
+A regular property override only affects the one target you set it under. On top of that, the popup exposes its own set of CSS variables covering size, color, and spacing for the popup's own chrome, each with a sensible default. Set these the same way, under whichever target the table below lists for it, written with quotes since they start with `--`:
+
+```yaml
+styles:
+  frame:
+    "--frame-border-radius": 12px
+  close-button:
+    "--close-button-hover-background": rgba(255, 0, 0, 0.2)
+```
+
+| Variable | Set it under | Default | What it changes |
+| :--- | :--- | :--- | :--- |
+| `--overlay-background` | `overlay` | `rgba(0, 0, 0, 0.6)` | Color of the dark background behind the popup. |
+| `--overlay-align-items` | `overlay` | `flex-start` | Vertical position of the popup on screen (`flex-start` anchors it near the top). |
+| `--frame-width` | `frame` | `auto` | Width of the popup window. |
+| `--frame-min-width` | `frame` | `240px` | The narrowest the popup is allowed to shrink to. |
+| `--frame-max-width` | `frame` | `90vw` | The widest the popup is allowed to grow to. |
+| `--frame-height` | `frame` | `auto` | Height of the popup window. |
+| `--frame-min-height` | `frame` | `10%` | The shortest the popup is allowed to shrink to. |
+| `--frame-max-height` | `frame` | `90vh` | The tallest the popup is allowed to grow to. |
+| `--frame-margin-top` | `frame` | `10vh` | Space above the popup, pushing it down from the top of the screen. |
+| `--frame-padding` | `frame` | `8px` | Padding inside the popup's outer frame. |
+| `--frame-background` | `frame` | Your theme's card background color | Background color of the popup window. |
+| `--frame-border-radius` | `frame` | Your theme's dialog corner rounding (or `28px`) | Corner rounding of the popup window. |
+| `--frame-box-shadow` | `frame` | `0 8px 32px rgba(0, 0, 0, 0.5)` | Shadow cast by the popup window. |
+| `--header-gap` | `header` | `16px` | Space between the close button and the title, when both are on the same side. |
+| `--header-background` | `header` | Your theme's card background color | Background color of the header bar. |
+| `--title-font-size` | `title` | `24px` | Font size of the title text. |
+| `--title-line-height` | `title` | `2rem` | Line height of the title text. |
+| `--title-letter-spacing` | `title` | `0.0125em` | Letter spacing of the title text. |
+| `--title-font-weight` | `title` | `400` | Font weight of the title text. |
+| `--title-color` | `title` | Your theme's primary text color | Color of the title text. |
+| `--title-margin-left` | `title` | `4px` | Space between the title and whatever sits next to it. |
+| `--close-button-background` | `close-button` | `none` | Background color of the close button. |
+| `--close-button-border` | `close-button` | `none` | Border of the close button. |
+| `--close-button-color` | `close-button` | Your theme's primary text color | Color of the close (X) icon. |
+| `--close-button-size` | `close-button` | `24px` | Width and height of the close button. |
+| `--close-button-padding` | `close-button` | `0` | Padding inside the close button, around the icon. |
+| `--close-button-border-radius` | `close-button` | `50%` | Corner rounding of the close button. |
+| `--close-button-hover-background` | `close-button` | `rgba(255, 255, 255, 0.1)` | Background color of the close button while hovered. |
+| `--body-overflow` | `body` | `auto` | How the body scrolls if your view is taller than the popup. |
+| `--sections-wrapper-padding` | `body` | `0px 8px` | Left/right spacing inside a `sections`-type view. See note below. |
+| `--sections-container-padding` | `body` | `8px 0px` | Top/bottom spacing inside a `sections`-type view. See note below. |
+| `--status-color` | `status` | Your theme's primary text color | Color of the "Loading…" text. |
+| `--status-error-color` | `status` | Your theme's error color (or `#ff5252`) | Color of an error message, if the view fails to load. |
+| `--status-padding` | `status` | `24px` | Padding around the loading/error text. |
+
+`--sections-wrapper-padding` and `--sections-container-padding` are a special case: they don't style anything of the popup's own. They adjust Home Assistant's own internal spacing for `sections`-type views specifically - the same spacing you'd see between cards on a normal sections dashboard page, but tightened by default so it looks right inside a popup. They only do anything when the view you're showing is a `sections` view, and they're set under `body`, since that's the popup's own target that contains it.
+
+The header's padding, the header's alignment, the close button's position, and the body's default padding all adjust themselves automatically based on `close-align`, `title-align`, and the view's own type - so they're not in the variable list above. They can still be changed directly, the normal way, by setting the property itself under the matching target (e.g. `styles: header: {padding: 8px}`).
 
 ---
 
