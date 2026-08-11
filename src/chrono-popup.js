@@ -67,9 +67,17 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // chrono-* plugin family (chrono-hvac-card, chrono-slider-card).
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.3.50';
+const CARD_VERSION = '1.3.51';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.3.51: Added --frame-padding (default 8px) to .frame - previously had
+//          no padding at all. Also made the hui-sections-view default
+//          padding (SECTIONS_WRAPPER_PADDING / SECTIONS_CONTAINER_PADDING)
+//          user-adjustable via --sections-wrapper-padding /
+//          --sections-container-padding, set under the existing "body"
+//          styles: target (CSS custom properties inherit through shadow
+//          boundaries, so this reaches hui-sections-view's own .wrapper/
+//          .container from .body without needing a new styles: target).
 // v1.3.50: Migrated styles: from styleMap (inline style="" attributes) to
 //          adoptedStyleSheets (real CSS via a CSSStyleSheet, appended
 //          after Lit's own static styles), matching the architecture used
@@ -414,7 +422,9 @@ const LAYOUT_PADDING_BY_TYPE = {
 // specific <hui-sections-view> instance's own shadow root instead (see
 // applySectionsDefaultCss below), scoped to just the view shown inside
 // this popup - other sections views elsewhere on the dashboard are
-// untouched.
+// untouched. These are the var() fallback defaults - user-adjustable via
+// --sections-wrapper-padding / --sections-container-padding, set under
+// the "body" styles: target (see the constructor).
 const SECTIONS_WRAPPER_PADDING = '0px 8px';
 const SECTIONS_CONTAINER_PADDING = '8px 0px';
 
@@ -694,7 +704,8 @@ class ChronoPopupHost extends LitElement {
     // Created once, content never changes - see applySectionsDefaultCss.
     this._sectionsStyleSheet = new CSSStyleSheet();
     this._sectionsStyleSheet.replaceSync(
-      `.wrapper { padding: ${SECTIONS_WRAPPER_PADDING}; }\n.container { padding: ${SECTIONS_CONTAINER_PADDING}; }`
+      `.wrapper { padding: var(--sections-wrapper-padding, ${SECTIONS_WRAPPER_PADDING}); }\n` +
+      `.container { padding: var(--sections-container-padding, ${SECTIONS_CONTAINER_PADDING}); }`
     );
   }
 
@@ -945,6 +956,7 @@ class ChronoPopupHost extends LitElement {
       min-height: var(--frame-min-height, 10%);
       max-height: var(--frame-max-height, 90vh);
       margin-top: var(--frame-margin-top, 10vh);
+      padding: var(--frame-padding, 8px);
       background: var(--frame-background, var(--card-background-color, #1c1c1c));
       border-radius: var(--frame-border-radius, var(--ha-dialog-border-radius, 28px));
       box-shadow: var(--frame-box-shadow, 0 8px 32px rgba(0, 0, 0, 0.5));
