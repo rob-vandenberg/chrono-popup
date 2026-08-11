@@ -67,7 +67,7 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // chrono-* plugin family (chrono-hvac-card, chrono-slider-card).
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.3.52';
+const CARD_VERSION = '1.3.53';
 
 // ─── Version History ────────────────────────────────────────────────────
 // v1.3.52: Removed --frame-padding / .frame padding entirely (reverted to
@@ -433,7 +433,7 @@ const LAYOUT_PADDING_BY_TYPE = {
 // --sections-wrapper-padding / --sections-container-padding, set under
 // the "body" styles: target (see the constructor).
 const SECTIONS_WRAPPER_PADDING = '0px 16px';
-const SECTIONS_CONTAINER_PADDING = '16px 0px';
+const SECTIONS_CONTAINER_PADDING = '0px 0px 16px';
 
 // Valid values for close-align / title-align, each defaulting to
 // "left". Invalid supplied values fall back to "left" via
