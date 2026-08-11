@@ -1,5 +1,4 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit@2.0.0/index.js?module';
-import { styleMap }              from 'https://unpkg.com/lit@2.0.0/directives/style-map.js?module';
 import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-websocket@9.6.0/dist/index.js';
 
 // chrono-popup.js
@@ -59,14 +58,43 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 // title-align: "left" (default) | "right" | "center" | "hidden" - only
 // title-holding element that takes vertical space; "hidden" collapses
 // the header to zero height even if title text is set.
-// styles: is nested by target - see STYLE_TARGETS below for the full
-// list of elements that can be styled (overlay, frame, header, title,
-// close-button, body, status). Each is optional.
+// styles: is nested by target - each key is translated directly to a CSS
+// class selector of the same name (kebab-case) and injected via
+// adoptedStyleSheets, e.g. styles.close-button -> .close-button { ... }.
+// One reserved key, "host", targets the popup's own :host instead of a
+// literal class. Any target name is accepted - there is no fixed
+// allowlist - matching the same styles: architecture used across the
+// chrono-* plugin family (chrono-hvac-card, chrono-slider-card).
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.2.48';
+const CARD_VERSION = '1.3.50';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.3.50: Migrated styles: from styleMap (inline style="" attributes) to
+//          adoptedStyleSheets (real CSS via a CSSStyleSheet, appended
+//          after Lit's own static styles), matching the architecture used
+//          in chrono-hvac-card / chrono-slider-card. All default visual
+//          styling now lives in one real static styles = css block, with
+//          var(--name, fallback) on every cosmetic/spacing/sizing
+//          property. styles: is no longer validated against a fixed
+//          STYLE_TARGETS allowlist - matching chrono-hvac-card, any
+//          target name (or the reserved "host" -> :host) is accepted and
+//          translated directly to CSS; a console.warn is still emitted if
+//          a given styles.<target> value isn't an object (format-error
+//          protection, not name validation). Computed per-render values
+//          (header padding, header min-height, header justify-content,
+//          close-button position, body padding) are now applied as CSS
+//          custom properties set inline on .frame - not full inline
+//          style="" properties - and read by the static CSS via var().
+//          This keeps them just as user-overridable via cascade as every
+//          other property, without needing a second, separately
+//          recompiled stylesheet. .close-button:hover background and
+//          .status/.status.error color are now var-driven too - both
+//          were previously impossible under styleMap's inline-beats-class
+//          specificity problem. Removed the now-unused styleMap import
+//          and the seven DEFAULT_*_STYLES JS objects (folded into static
+//          styles). applySectionsDefaultCss / _sectionsStyleSheet are
+//          unchanged - they already used this exact pattern.
 // v1.2.48: Added hard-coded default padding for hui-sections-view's own
 //          internal .wrapper/.container elements (HA's, not ours - not
 //          reachable via styles:). Applied per-instance, scoped to just
@@ -344,72 +372,25 @@ const EVENT_KEY = 'chrono-popup';
 
 const KNOWN_DATA_KEYS = ['title', 'view', 'styles', 'dismissable', 'close-align', 'title-align'];
 
-// Valid sub-keys under styles: - one per distinct element in the template.
-const STYLE_TARGETS = ['overlay', 'frame', 'header', 'title', 'close-button', 'body', 'status'];
-
-const DEFAULT_OVERLAY_STYLES = {
-  background: 'rgba(0, 0, 0, 0.6)',
-  alignItems: 'flex-start',
-};
-
-const DEFAULT_FRAME_STYLES = {
-  width:        'auto',
-  minWidth:     '240px',
-  maxWidth:     '90vw',
-  height:       'auto',
-  minHeight:    '10%',
-  maxHeight:    '90vh',
-  marginTop:    '10vh',
-  background:   'var(--card-background-color, #1c1c1c)',
-  borderRadius: 'var(--ha-dialog-border-radius, 28px)',
-  boxShadow:    '0 8px 32px rgba(0, 0, 0, 0.5)',
-};
-
-const DEFAULT_HEADER_STYLES = {
-  gap:        '16px',
-  padding:    '20px 8px 12px 20px',
-  background: 'var(--card-background-color)',
-};
-
-const DEFAULT_TITLE_STYLES = {
-  fontSize:      '24px',
-  lineHeight:    '2rem',
-  letterSpacing: '0.0125em',
-  fontWeight:    '400',
-  color:         'var(--primary-text-color, #fff)',
-  whiteSpace:    'nowrap',
-  overflow:      'hidden',
-  textOverflow:  'ellipsis',
-  marginLeft:    '4px',
-};
-
 // Close button footprint, used both to size/position the button itself
 // (absolute against .frame) and, together with the header padding
 // constants below, to keep the button and title vertically aligned
 // while letting the header's total height be tuned independently.
+// Also interpolated directly into static styles (Section: Styles) as the
+// CSS var() fallback for the button's own width/height/top, so the JS
+// math and the CSS default can never drift apart into two different
+// numbers.
 const CLOSE_BUTTON_SIZE_PX = 24;
 const CLOSE_BUTTON_INSET_TOP_PX = 18;
-
-const DEFAULT_CLOSE_BUTTON_STYLES = {
-  background:   'none',
-  border:       'none',
-  color:        'var(--primary-text-color, #fff)',
-  width:        `${CLOSE_BUTTON_SIZE_PX}px`,
-  height:       `${CLOSE_BUTTON_SIZE_PX}px`,
-  padding:      '0',
-  borderRadius: '50%',
-};
-
-const DEFAULT_BODY_STYLES = {
-  overflow: 'auto',
-};
 
 // Only panel views lack their own built-in spacing (masonry and sections
 // both self-pad) - this applies as .body's default padding, only when
 // the resolved view's type is "panel".
 // Per-view-type default .body padding. Real HA view types are masonry,
 // sections, panel, sidebar - unmatched/unknown types fall back to
-// DEFAULT_LAYOUT_PADDING.
+// DEFAULT_LAYOUT_PADDING. NOTE: this literal string is also duplicated as
+// the static-CSS var() fallback for --body-padding (Section: Styles) -
+// keep both in sync if changed.
 const DEFAULT_LAYOUT_PADDING = '0px 0px 12px 0px';
 const PANEL_LAYOUT_PADDING = '4px 24px 24px 24px';
 const SECTIONS_LAYOUT_PADDING = '0px 0px 0px 0px';
@@ -436,6 +417,107 @@ const LAYOUT_PADDING_BY_TYPE = {
 // untouched.
 const SECTIONS_WRAPPER_PADDING = '0px 8px';
 const SECTIONS_CONTAINER_PADDING = '8px 0px';
+
+// Valid values for close-align / title-align, each defaulting to
+// "left". Invalid supplied values fall back to "left" via
+// resolveAlignOption() below, with a console.warn().
+const CLOSE_ALIGN_VALUES = ['left', 'right', 'hidden'];
+const TITLE_ALIGN_VALUES = ['left', 'right', 'center', 'hidden'];
+
+const TITLE_ALIGN_JUSTIFY_CONTENT = {
+  left: 'flex-start',
+  right: 'flex-end',
+  center: 'center',
+};
+
+// Close button footprint, used both to position the button itself
+// (absolute against .frame) and to size .header's reserved side
+// padding so title text never runs underneath it.
+//
+// CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX are declared earlier,
+// in the Version-adjacent Constants block above.
+const CLOSE_BUTTON_INSET_SIDE_PX = 20;
+const CLOSE_BUTTON_INSET_TOP = `${CLOSE_BUTTON_INSET_TOP_PX}px`;
+const CLOSE_BUTTON_INSET_SIDE = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
+
+// Reserved-side header padding = the button's own side inset + its
+// width + a small gap so the title's ellipsis doesn't run flush
+// against it. Normal-side padding = just the side inset, same value
+// used for the button-hidden case, kept as a separate constant so the
+// two meanings (reserved vs. normal) don't accidentally end up as the
+// same literal by coincidence.
+const HEADER_TITLE_BUTTON_GAP_PX = 16;
+const HEADER_SIDE_RESERVED_PX = CLOSE_BUTTON_INSET_SIDE_PX + CLOSE_BUTTON_SIZE_PX + HEADER_TITLE_BUTTON_GAP_PX;
+const HEADER_SIDE_RESERVED = `${HEADER_SIDE_RESERVED_PX}px`;
+const HEADER_SIDE_NORMAL = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
+
+// NOTE: this literal string is also duplicated as the static-CSS var()
+// fallback for --header-padding (Section: Styles) - keep both in sync
+// if changed.
+const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
+
+// Vertical geometry, button-shown case. Two independent knobs:
+//  - HEADER_TOTAL_HEIGHT_PX: how tall the header box is overall (and
+//    therefore how far the body sits below the button/title).
+//  - BUTTON_CENTER_OFFSET_PX: where the button's (and therefore the
+//    title's) vertical center sits, from the frame top - fixed to the
+//    button's own inset + half its height, so the two can never drift
+//    apart (this is what v1.2.43 fixed).
+// HEADER_PADDING_BOTTOM_PX is a free choice (0, i.e. the header's
+// bottom edge sits as close to the button/title's own center as the
+// alignment math allows).
+//
+// IMPORTANT: this file sets no box-sizing anywhere, so the CSS default
+// (content-box) applies. Under content-box, min-height sizes the
+// CONTENT area only - padding is added ON TOP of it, not included in
+// it. v1.2.45 set min-height directly to HEADER_TOTAL_HEIGHT_PX, which
+// under content-box actually produced a real total of
+// padding-top + HEADER_TOTAL_HEIGHT_PX + padding-bottom (62px, not
+// 50px), and threw off the title's centering by the same amount
+// (fixed here in v1.2.46). HEADER_CONTENT_BOX_HEIGHT_PX is the correct
+// value for min-height - solved so that, once padding is added on top
+// of it, the title's center still lands on BUTTON_CENTER_OFFSET_PX and
+// the real total still equals HEADER_TOTAL_HEIGHT_PX.
+const HEADER_TOTAL_HEIGHT_PX = 50;
+const BUTTON_CENTER_OFFSET_PX = CLOSE_BUTTON_INSET_TOP_PX + CLOSE_BUTTON_SIZE_PX / 2;
+const HEADER_PADDING_BOTTOM_PX = 0;
+const HEADER_CONTENT_BOX_HEIGHT_PX = 2 * (HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - BUTTON_CENTER_OFFSET_PX);
+const HEADER_PADDING_TOP_PX = HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - HEADER_CONTENT_BOX_HEIGHT_PX;
+const HEADER_MIN_HEIGHT = `${HEADER_CONTENT_BOX_HEIGHT_PX}px`;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+// Converts a snake_case string to kebab-case. Used for both the styles:
+// target key (-> class name) and its property names, since CSS text
+// treats them identically syntactically. Matches chrono-hvac-card's
+// chToKebab exactly.
+function toKebabCase(str) {
+  return String(str).replace(/_/g, '-');
+}
+
+// Converts config.styles (a flat { target: { property: value } } object)
+// into a single ready-to-inject CSS text block. No validation of target
+// names or property names against anything - any key the user writes is
+// translated as-is, matching chrono-hvac-card's chBuildUserStylesCss. One
+// reserved key, 'host', targets the popup's own :host instead of a
+// literal class. A target whose value isn't a plain object is skipped
+// with a console.warn (format-error protection, not name validation -
+// we don't block typos in the target name itself, only malformed values).
+function buildUserStylesCss(stylesConfig) {
+  let cssText = '';
+  for (const [target, props] of Object.entries(stylesConfig)) {
+    if (!props || typeof props !== 'object' || Array.isArray(props)) {
+      console.warn(`chrono-popup: styles.${target} must be an object, got ${typeof props}. Ignoring.`);
+      continue;
+    }
+    const declarations = Object.entries(props)
+      .map(([prop, value]) => `${toKebabCase(prop)}: ${value};`)
+      .join(' ');
+    const selector = target === 'host' ? ':host' : `.${toKebabCase(target)}`;
+    cssText += `${selector} { ${declarations} }\n`;
+  }
+  return cssText;
+}
 
 // Recursively searches a DOM/shadow tree for the first element with the
 // given tag name, crossing into any open shadow roots it encounters.
@@ -487,73 +569,6 @@ function applySectionsDefaultCss(hostRoot, sheet) {
   }
 }
 
-const DEFAULT_STATUS_STYLES = {
-  padding: '24px',
-};
-
-// Valid values for close-align / title-align, each defaulting to
-// "left". Invalid supplied values fall back to "left" via
-// resolveAlignOption() below, with a console.warn().
-const CLOSE_ALIGN_VALUES = ['left', 'right', 'hidden'];
-const TITLE_ALIGN_VALUES = ['left', 'right', 'center', 'hidden'];
-
-const TITLE_ALIGN_JUSTIFY_CONTENT = {
-  left: 'flex-start',
-  right: 'flex-end',
-  center: 'center',
-};
-
-// Close button footprint, used both to position the button itself
-// (absolute against .frame) and to size .header's reserved side
-// padding so title text never runs underneath it.
-//
-// CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX are declared earlier,
-// alongside DEFAULT_CLOSE_BUTTON_STYLES.
-const CLOSE_BUTTON_INSET_SIDE_PX = 20;
-const CLOSE_BUTTON_INSET_TOP = `${CLOSE_BUTTON_INSET_TOP_PX}px`;
-const CLOSE_BUTTON_INSET_SIDE = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
-
-// Reserved-side header padding = the button's own side inset + its
-// width + a small gap so the title's ellipsis doesn't run flush
-// against it. Normal-side padding = just the side inset, same value
-// used for the button-hidden case, kept as a separate constant so the
-// two meanings (reserved vs. normal) don't accidentally end up as the
-// same literal by coincidence.
-const HEADER_TITLE_BUTTON_GAP_PX = 16;
-const HEADER_SIDE_RESERVED_PX = CLOSE_BUTTON_INSET_SIDE_PX + CLOSE_BUTTON_SIZE_PX + HEADER_TITLE_BUTTON_GAP_PX;
-const HEADER_SIDE_RESERVED = `${HEADER_SIDE_RESERVED_PX}px`;
-const HEADER_SIDE_NORMAL = `${CLOSE_BUTTON_INSET_SIDE_PX}px`;
-
-const HEADER_PADDING_NO_BUTTON = '20px 20px 12px 20px';
-
-// Vertical geometry, button-shown case. Two independent knobs:
-//  - HEADER_TOTAL_HEIGHT_PX: how tall the header box is overall (and
-//    therefore how far the body sits below the button/title).
-//  - BUTTON_CENTER_OFFSET_PX: where the button's (and therefore the
-//    title's) vertical center sits, from the frame top - fixed to the
-//    button's own inset + half its height, so the two can never drift
-//    apart (this is what v1.2.43 fixed).
-// HEADER_PADDING_BOTTOM_PX is a free choice (0, i.e. the header's
-// bottom edge sits as close to the button/title's own center as the
-// alignment math allows).
-//
-// IMPORTANT: this file sets no box-sizing anywhere, so the CSS default
-// (content-box) applies. Under content-box, min-height sizes the
-// CONTENT area only - padding is added ON TOP of it, not included in
-// it. v1.2.45 set min-height directly to HEADER_TOTAL_HEIGHT_PX, which
-// under content-box actually produced a real total of
-// padding-top + HEADER_TOTAL_HEIGHT_PX + padding-bottom (62px, not
-// 50px), and threw off the title's centering by the same amount
-// (fixed here in v1.2.46). HEADER_CONTENT_BOX_HEIGHT_PX is the correct
-// value for min-height - solved so that, once padding is added on top
-// of it, the title's center still lands on BUTTON_CENTER_OFFSET_PX and
-// the real total still equals HEADER_TOTAL_HEIGHT_PX.
-const HEADER_TOTAL_HEIGHT_PX = 50;
-const BUTTON_CENTER_OFFSET_PX = CLOSE_BUTTON_INSET_TOP_PX + CLOSE_BUTTON_SIZE_PX / 2;
-const HEADER_PADDING_BOTTOM_PX = 0;
-const HEADER_CONTENT_BOX_HEIGHT_PX = 2 * (HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - BUTTON_CENTER_OFFSET_PX);
-const HEADER_PADDING_TOP_PX = HEADER_TOTAL_HEIGHT_PX - HEADER_PADDING_BOTTOM_PX - HEADER_CONTENT_BOX_HEIGHT_PX;
-
 // Reserves header side padding only where the button actually needs
 // it - never both sides just because a button exists:
 //  - title-align: center -> both sides reserved (the title's own box
@@ -583,7 +598,38 @@ function computeHeaderPadding(titleAlign, closeAlign) {
   return `${HEADER_PADDING_TOP_PX}px ${right} ${HEADER_PADDING_BOTTOM_PX}px ${left}`;
 }
 
-const HEADER_MIN_HEIGHT = `${HEADER_CONTENT_BOX_HEIGHT_PX}px`;
+// Builds the one inline style="" string applied to .frame each render -
+// CSS custom-property declarations only (never real visual properties
+// directly), so the static CSS's own var(--name, fallback) rules are
+// what actually paint, and the user's own adoptedStyleSheets override
+// still wins cascade ties against them exactly like every other
+// property. This is what lets computed-per-render values (header
+// padding, header min-height, header justify-content, close-button
+// position, body padding) stay just as user-overridable as the plain
+// static defaults, without a second, separately recompiled stylesheet.
+function buildComputedFrameVarsCss(showCloseButton, titleAlign, closeAlign, viewType) {
+  const headerPadding = showCloseButton ? computeHeaderPadding(titleAlign, closeAlign) : HEADER_PADDING_NO_BUTTON;
+  const bodyPadding = LAYOUT_PADDING_BY_TYPE[viewType] ?? DEFAULT_LAYOUT_PADDING;
+  const justifyContent = TITLE_ALIGN_JUSTIFY_CONTENT[titleAlign] ?? 'flex-start';
+
+  const decls = [
+    `--header-padding: ${headerPadding}`,
+    `--header-justify-content: ${justifyContent}`,
+    `--body-padding: ${bodyPadding}`,
+  ];
+
+  if (showCloseButton) {
+    decls.push(`--header-min-height: ${HEADER_MIN_HEIGHT}`);
+    decls.push(`--close-button-top: ${CLOSE_BUTTON_INSET_TOP}`);
+    if (closeAlign === 'right') {
+      decls.push(`--close-button-right: ${CLOSE_BUTTON_INSET_SIDE}`);
+    } else {
+      decls.push(`--close-button-left: ${CLOSE_BUTTON_INSET_SIDE}`);
+    }
+  }
+
+  return decls.join('; ');
+}
 
 // Validates a close-align/title-align value against its allowed list.
 // Missing value -> default, silently. Present but invalid -> default,
@@ -627,7 +673,7 @@ class ChronoPopupHost extends LitElement {
     _open:    { state: true },
     _loading: { state: true },
     _error:   { state: true },
-    _opts:    { state: true }, // { title, dismissable, closeAlign, titleAlign, styles } - width/height/background/radius are fixed defaults, override only via styles
+    _opts:    { state: true }, // { title, dismissable, closeAlign, titleAlign }
     _view:    { state: true }, // { lovelace, index, viewConfig } for <hui-view>, once resolved
   };
 
@@ -641,11 +687,26 @@ class ChronoPopupHost extends LitElement {
     this._hassUnsub = null; // unsubscribe fn for the live entity-updates subscription, while a popup is open
     this._onKeydown = this._onKeydown.bind(this);
 
+    // Created once, content replaced whenever styles: config changes (in
+    // open()). Appended to adoptedStyleSheets once, in firstUpdated().
+    this._userStyleSheet = new CSSStyleSheet();
+
     // Created once, content never changes - see applySectionsDefaultCss.
     this._sectionsStyleSheet = new CSSStyleSheet();
     this._sectionsStyleSheet.replaceSync(
       `.wrapper { padding: ${SECTIONS_WRAPPER_PADDING}; }\n.container { padding: ${SECTIONS_CONTAINER_PADDING}; }`
     );
+  }
+
+  // Appended after Lit's own static-style sheets (already present in
+  // adoptedStyleSheets by this point) so styles: overrides win cascade
+  // ties against them, on any property, not just ones the built-in
+  // styles leave undeclared. Matches chrono-hvac-card's firstUpdated().
+  firstUpdated() {
+    this.renderRoot.adoptedStyleSheets = [
+      ...this.renderRoot.adoptedStyleSheets,
+      this._userStyleSheet,
+    ];
   }
 
   connectedCallback() {
@@ -741,24 +802,14 @@ class ChronoPopupHost extends LitElement {
       }
     }
 
-    const rawStyles = (data.styles && typeof data.styles === 'object') ? data.styles : {};
-    const styles = {};
-    for (const key of STYLE_TARGETS) {
-      const value = rawStyles[key];
-      if (value != null && typeof value !== 'object') {
-        console.warn(
-          `chrono-popup: styles.${key} must be an object, got ${typeof value}. Ignoring invalid style value.`
-        );
-      }
-      styles[key] = (value && typeof value === 'object') ? value : {};
-    }
+    const rawStyles = (data.styles && typeof data.styles === 'object' && !Array.isArray(data.styles)) ? data.styles : {};
+    this._userStyleSheet.replaceSync(buildUserStylesCss(rawStyles));
 
     this._opts = {
       title: data.title ?? '',
       dismissable: data.dismissable !== false, // backdrop-click-to-close, on by default
       closeAlign: resolveAlignOption(data['close-align'], CLOSE_ALIGN_VALUES, 'close-align'),
       titleAlign: resolveAlignOption(data['title-align'], TITLE_ALIGN_VALUES, 'title-align'),
-      styles,
     };
     this._error = null;
     this._view = null;
@@ -854,6 +905,21 @@ class ChronoPopupHost extends LitElement {
     return false;
   }
 
+  // ─── Styles ──────────────────────────────────────────────────────────
+  // All default visual styling lives here, as real CSS with real class
+  // selectors - not JS objects merged at render time. Lit compiles and
+  // auto-adopts this before firstUpdated() runs. Every cosmetic/spacing/
+  // sizing property is written as var(--kebab-name, fallback), matching
+  // chrono-hvac-card's own static styles exactly. Structural rules
+  // (position, display, flex layout, z-index, the ellipsis-truncation
+  // trio on .title) are intentionally left plain, not var'd - per
+  // project convention, vars are reserved for visual styling values
+  // (font/padding/margin/border/background/etc.), not for values whose
+  // role is purely structural or computed. Every property here, var'd or
+  // not, remains fully overridable by the user's own styles: config -
+  // that comes from cascade order (this sheet -> computed vars on .frame
+  // -> the user's own sheet, appended last in firstUpdated()), not from
+  // which properties happen to use var().
   static styles = css`
     :host {
       display: contents;
@@ -864,17 +930,45 @@ class ChronoPopupHost extends LitElement {
       z-index: 1000;
       display: flex;
       justify-content: center;
+      background: var(--overlay-background, rgba(0, 0, 0, 0.6));
+      align-items: var(--overlay-align-items, flex-start);
     }
     .frame {
       position: relative;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      width: var(--frame-width, auto);
+      min-width: var(--frame-min-width, 240px);
+      max-width: var(--frame-max-width, 90vw);
+      height: var(--frame-height, auto);
+      min-height: var(--frame-min-height, 10%);
+      max-height: var(--frame-max-height, 90vh);
+      margin-top: var(--frame-margin-top, 10vh);
+      background: var(--frame-background, var(--card-background-color, #1c1c1c));
+      border-radius: var(--frame-border-radius, var(--ha-dialog-border-radius, 28px));
+      box-shadow: var(--frame-box-shadow, 0 8px 32px rgba(0, 0, 0, 0.5));
     }
     .header {
       display: flex;
       align-items: center;
       flex: 0 0 auto;
+      gap: var(--header-gap, 16px);
+      background: var(--header-background, var(--card-background-color));
+      padding: var(--header-padding, 20px 20px 12px 20px);
+      min-height: var(--header-min-height, auto);
+      justify-content: var(--header-justify-content, flex-start);
+    }
+    .title {
+      font-size: var(--title-font-size, 24px);
+      line-height: var(--title-line-height, 2rem);
+      letter-spacing: var(--title-letter-spacing, 0.0125em);
+      font-weight: var(--title-font-weight, 400);
+      color: var(--title-color, var(--primary-text-color, #fff));
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-left: var(--title-margin-left, 4px);
     }
     .close-button {
       cursor: pointer;
@@ -882,9 +976,21 @@ class ChronoPopupHost extends LitElement {
       align-items: center;
       justify-content: center;
       flex: 0 0 auto;
+      position: absolute;
+      z-index: 999;
+      top: var(--close-button-top, ${CLOSE_BUTTON_INSET_TOP_PX}px);
+      left: var(--close-button-left, auto);
+      right: var(--close-button-right, auto);
+      background: var(--close-button-background, none);
+      border: var(--close-button-border, none);
+      color: var(--close-button-color, var(--primary-text-color, #fff));
+      width: var(--close-button-size, ${CLOSE_BUTTON_SIZE_PX}px);
+      height: var(--close-button-size, ${CLOSE_BUTTON_SIZE_PX}px);
+      padding: var(--close-button-padding, 0);
+      border-radius: var(--close-button-border-radius, 50%);
     }
     .close-button:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--close-button-hover-background, rgba(255, 255, 255, 0.1));
     }
     .close-button svg {
       display: block;
@@ -896,6 +1002,8 @@ class ChronoPopupHost extends LitElement {
     .body {
       position: relative;
       flex: 1 1 auto;
+      overflow: var(--body-overflow, auto);
+      padding: var(--body-padding, 0px 0px 12px 0px);
     }
     .body hui-view {
       display: contents;
@@ -903,45 +1011,33 @@ class ChronoPopupHost extends LitElement {
       padding: 0;
     }
     .status {
-      color: var(--primary-text-color, #fff);
+      color: var(--status-color, var(--primary-text-color, #fff));
+      padding: var(--status-padding, 24px);
     }
     .status.error {
-      color: var(--error-color, #ff5252);
+      color: var(--status-error-color, var(--error-color, #ff5252));
     }
   `;
 
   render() {
     if (!this._open) return html``;
 
-    const { title, dismissable, styles, closeAlign, titleAlign } = this._opts;
+    const { title, dismissable, closeAlign, titleAlign } = this._opts;
     const showCloseButton = closeAlign !== 'hidden';
     const showHeader = !!title && titleAlign !== 'hidden';
-    const headerPadding = showCloseButton ? computeHeaderPadding(titleAlign, closeAlign) : HEADER_PADDING_NO_BUTTON;
-    const headerMinHeight = showCloseButton ? HEADER_MIN_HEIGHT : undefined;
+    const frameVarsCss = buildComputedFrameVarsCss(showCloseButton, titleAlign, closeAlign, this._view?.viewConfig?.type);
 
     return html`
       <div
         class="overlay"
-        style=${styleMap({ ...DEFAULT_OVERLAY_STYLES, ...styles.overlay })}
         @click=${(ev) => {
           if (dismissable && ev.target === ev.currentTarget) this.close();
         }}
       >
-        <div
-          class="frame"
-          style=${styleMap({ ...DEFAULT_FRAME_STYLES, ...styles.frame })}
-        >
+        <div class="frame" style=${frameVarsCss}>
           ${showCloseButton ? html`
             <button
               class="close-button"
-              style=${styleMap({
-                ...DEFAULT_CLOSE_BUTTON_STYLES,
-                position: 'absolute',
-                zIndex: '999',
-                top: CLOSE_BUTTON_INSET_TOP,
-                ...(closeAlign === 'right' ? { right: CLOSE_BUTTON_INSET_SIDE } : { left: CLOSE_BUTTON_INSET_SIDE }),
-                ...styles['close-button'],
-              })}
               @click=${() => this.close()}
               aria-label="Close"
             >
@@ -951,23 +1047,13 @@ class ChronoPopupHost extends LitElement {
             </button>
           ` : ''}
           ${showHeader ? html`
-            <div class="header" style=${styleMap({
-              ...DEFAULT_HEADER_STYLES,
-              padding: headerPadding,
-              ...(headerMinHeight ? { minHeight: headerMinHeight } : {}),
-              justifyContent: TITLE_ALIGN_JUSTIFY_CONTENT[titleAlign] ?? 'flex-start',
-              ...styles.header,
-            })}>
-              <span class="title" style=${styleMap({ ...DEFAULT_TITLE_STYLES, ...styles.title })}>${title}</span>
+            <div class="header">
+              <span class="title">${title}</span>
             </div>
           ` : ''}
-          <div class="body" style=${styleMap({
-            ...DEFAULT_BODY_STYLES,
-            padding: LAYOUT_PADDING_BY_TYPE[this._view?.viewConfig?.type] ?? DEFAULT_LAYOUT_PADDING,
-            ...styles.body,
-          })}>
-            ${this._loading ? html`<div class="status" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>Loading…</div>` : ''}
-            ${this._error ? html`<div class="status error" style=${styleMap({ ...DEFAULT_STATUS_STYLES, ...styles.status })}>${this._error}</div>` : ''}
+          <div class="body">
+            ${this._loading ? html`<div class="status">Loading…</div>` : ''}
+            ${this._error ? html`<div class="status error">${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
               ? html`<hui-view
                   .hass=${this._getHass()}
