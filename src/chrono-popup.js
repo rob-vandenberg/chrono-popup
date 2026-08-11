@@ -1,378 +1,60 @@
 import { LitElement, html, css } from 'https://unpkg.com/lit@2.0.0/index.js?module';
 import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-websocket@9.6.0/dist/index.js';
 
-// chrono-popup.js
-//
-// NOT a card in the "place it on a dashboard" sense. There is no
-// window.customCards entry, no getConfigElement(), no config schema for a
-// placed instance - none of that applies here.
-//
-// It is a JS resource: loading it registers one singleton overlay host on
-// document.body and one document-level "ll-custom" listener. Any tap_action
-// (fire-dom-event) anywhere on any card can then open a popup that renders
-// a Home Assistant *subview* - a dashboard view the user designs themselves
-// in the normal HA dashboard editor - inline inside a lightweight window
-// frame (header, title, close button). This exists to replace the
-// hand-assembled layout-card/conditional/grid-area YAML people currently
-// have to write to get a custom popup layout via browser_mod.popup, with
-// "design it visually as a real view, then point the popup at it".
-//
-// All view types (panel, masonry, sections, sidebar) are supported -
-// layout is delegated entirely to HA's own <hui-view> element rather than
-// reimplemented here, the same technique used by the third-party
-// embedded-view-card. <hui-view> is an internal HA frontend component,
-// not a documented/stable public API - subject to change by HA core.
-//
-// View visibility rules (view.visible / visibility / users) are respected
-// before rendering, same as HA's own dashboard: a view hidden from the
-// current user stays hidden here too.
-//
-// Usage, from any card's tap_action:
-//
-//   tap_action:
-//     action: fire-dom-event
-//     chrono-popup:
-//       data:
-//         title: "Hello, world!"
-//         view: "/dashboard-test/uren-panel"
-//         dismissable: true
-//         styles:
-//           frame:
-//             width: 640px
-//             height: 580px
-//             background: "#000000"
-//             border-radius: 50px
-//           header:
-//             padding: 8px 8px 0 8px
-//
-// `view` is "/<dashboard url_path>/<view path>". Both segments are
-// required in v1 - the default (unnamed) dashboard is not yet supported,
-// only dashboards with an explicit url_path.
-//
-// Recognized top-level keys: title, view, styles, dismissable,
-// close-align, title-align. Anything else is not read -
-// console.warn()'d instead of failing silently.
-//
-// close-align: "left" (default) | "right" | "hidden" - position of the
-// close button, or hide it entirely. Always takes zero vertical space.
-// title-align: "left" (default) | "right" | "center" | "hidden" - only
-// title-holding element that takes vertical space; "hidden" collapses
-// the header to zero height even if title text is set.
-// styles: is nested by target - each key is translated directly to a CSS
-// class selector of the same name (kebab-case) and injected via
-// adoptedStyleSheets, e.g. styles.close-button -> .close-button { ... }.
-// One reserved key, "host", targets the popup's own :host instead of a
-// literal class. Any target name is accepted - there is no fixed
-// allowlist - matching the same styles: architecture used across the
-// chrono-* plugin family (chrono-hvac-card, chrono-slider-card).
+// chrono-popup.js - a JS resource (not a card): registers a singleton
+// overlay host + document "ll-custom" listener, so any tap_action
+// (fire-dom-event, key "chrono-popup") can show an HA dashboard view or
+// subview as a popup via <hui-view>. Data keys: title, view
+// ("/dashboard/view"), styles (per-target CSS, "host" -> :host, no
+// allowlist), dismissable, close-align, title-align.
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.3.53';
+const CARD_VERSION = '1.3.54';
 
 // ─── Version History ────────────────────────────────────────────────────
-// v1.3.52: Removed --frame-padding / .frame padding entirely (reverted to
-//          pre-1.3.51 - no declared padding on .frame). Increased the
-//          hui-sections-view default padding: SECTIONS_WRAPPER_PADDING
-//          '0px 8px' -> '0px 16px', SECTIONS_CONTAINER_PADDING
-//          '8px 0px' -> '16px 0px'. --sections-wrapper-padding /
-//          --sections-container-padding (added in v1.3.51) still work
-//          the same way, just with new fallback defaults.
-// v1.3.51: Added --frame-padding (default 8px) to .frame - previously had
-//          no padding at all. Also made the hui-sections-view default
-//          padding (SECTIONS_WRAPPER_PADDING / SECTIONS_CONTAINER_PADDING)
-//          user-adjustable via --sections-wrapper-padding /
-//          --sections-container-padding, set under the existing "body"
-//          styles: target (CSS custom properties inherit through shadow
-//          boundaries, so this reaches hui-sections-view's own .wrapper/
-//          .container from .body without needing a new styles: target).
-// v1.3.50: Migrated styles: from styleMap (inline style="" attributes) to
-//          adoptedStyleSheets (real CSS via a CSSStyleSheet, appended
-//          after Lit's own static styles), matching the architecture used
-//          in chrono-hvac-card / chrono-slider-card. All default visual
-//          styling now lives in one real static styles = css block, with
-//          var(--name, fallback) on every cosmetic/spacing/sizing
-//          property. styles: is no longer validated against a fixed
-//          STYLE_TARGETS allowlist - matching chrono-hvac-card, any
-//          target name (or the reserved "host" -> :host) is accepted and
-//          translated directly to CSS; a console.warn is still emitted if
-//          a given styles.<target> value isn't an object (format-error
-//          protection, not name validation). Computed per-render values
-//          (header padding, header min-height, header justify-content,
-//          close-button position, body padding) are now applied as CSS
-//          custom properties set inline on .frame - not full inline
-//          style="" properties - and read by the static CSS via var().
-//          This keeps them just as user-overridable via cascade as every
-//          other property, without needing a second, separately
-//          recompiled stylesheet. .close-button:hover background and
-//          .status/.status.error color are now var-driven too - both
-//          were previously impossible under styleMap's inline-beats-class
-//          specificity problem. Removed the now-unused styleMap import
-//          and the seven DEFAULT_*_STYLES JS objects (folded into static
-//          styles). applySectionsDefaultCss / _sectionsStyleSheet are
-//          unchanged - they already used this exact pattern.
-// v1.2.48: Added hard-coded default padding for hui-sections-view's own
-//          internal .wrapper/.container elements (HA's, not ours - not
-//          reachable via styles:). Applied per-instance, scoped to just
-//          the sections view shown inside this popup - other sections
-//          views on the dashboard are untouched. Mechanism: locates the
-//          specific <hui-sections-view> instance via
-//          findElementInShadowTree() (crosses open shadow roots by tag
-//          name, not a fixed depth path, since HA's exact nesting isn't
-//          a stable public contract) and appends one reusable
-//          CSSStyleSheet to its shadowRoot.adoptedStyleSheets, matching
-//          the pattern already used in chrono-hvac-card /
-//          chrono-slider-card (single sheet, created once, appended
-//          not replaced, content set via replaceSync). No config option
-//          - hard default, not opt-in. Re-checked on every render and
-//          on every live entity update (both idempotent) so it
-//          self-heals if HA ever recreates the element.
-// v1.2.47: DEFAULT_FRAME_STYLES.minWidth: 480px -> 240px, to allow
-//          narrower popups on small/custom mobile themes without the
-//          old default forcing a wider frame than styles.frame.width
-//          requested.
-// v1.2.46: Fixed title rendering ~6px below the close button again,
-//          for a different reason than v1.2.43. Root cause this time:
-//          the file sets no box-sizing anywhere, so the CSS default
-//          (content-box) applies - under content-box, min-height sizes
-//          the content area only, and padding is added ON TOP of it.
-//          v1.2.45 set the header's min-height directly to the desired
-//          TOTAL height (50px), which under content-box actually
-//          produced a real total of padding-top + 50 + padding-bottom
-//          (62px), and shifted the title's center down by the same
-//          gap. Added HEADER_CONTENT_BOX_HEIGHT_PX, solved separately
-//          from HEADER_TOTAL_HEIGHT_PX so that once padding is added
-//          on top of it, both the true total and the title's center
-//          come out correct. Also corrected close button top inset:
-//          19px -> 18px (v1.2.45 applied a 3px downshift; 2px was
-//          intended).
-// v1.2.45: Decoupled the header's total height from the button/title
-//          alignment point - v1.2.43's symmetric min-height approach
-//          forced both to be the same number, which couldn't express
-//          "move the button/title down 3px AND bring the header 6px
-//          closer to the body" (a net header total of 50px, down from
-//          56px) as two independent adjustments. Close button top
-//          inset: 16px -> 19px. Header vertical padding is now solved
-//          from BUTTON_CENTER_OFFSET_PX (button's own alignment point)
-//          and HEADER_TOTAL_HEIGHT_PX (50px) as two separate knobs,
-//          instead of one shared value - padding-top 0 -> 12px,
-//          padding-bottom stays 0px. Title still centers exactly on
-//          the button regardless of header height, and the header
-//          total can now be tuned on its own without moving the
-//          button/title.
-// v1.2.44: Fixed header side padding being reserved on BOTH sides for
-//          every close-align/title-align combination - that was only
-//          ever meant to apply to title-align: center. Replaced the
-//          fixed HEADER_PADDING_BUTTON_RESERVED constant with
-//          computeHeaderPadding(), which reserves space only on the
-//          side the button actually occupies: both sides for center,
-//          one side when title and button share a side, neither side
-//          when they're on opposite edges (e.g. title-align: left +
-//          close-align: right now renders fully flush left, as
-//          intended). DEFAULT_TITLE_STYLES: fontSize 1.4rem -> 24px,
-//          fontWeight 500 -> 400.
-// v1.2.43: Fixed title rendering below the close button's vertical
-//          center when a title is shown. Cause: .header's old
-//          asymmetric padding (20px top / 12px bottom) was a leftover
-//          from the pre-1.2.41 design, when the button lived inside
-//          .header and the padding was shaped around it - once the
-//          button moved to independent absolute positioning, that
-//          padding kept its old shape but lost any relationship to
-//          where the button actually sits, so the two drifted apart.
-//          Fix: CLOSE_BUTTON_SIZE_PX / CLOSE_BUTTON_INSET_TOP_PX
-//          extracted as shared numeric constants; HEADER_MIN_HEIGHT is
-//          now derived from them (2 * inset + size) rather than being
-//          a second, independently-chosen number. .header's vertical
-//          padding dropped to 0 (button-shown case) and given that
-//          min-height instead, so align-items: center places the
-//          title's vertical center at exactly the same point as the
-//          button's, by construction - not by coincidence, and it
-//          can't drift again even if button size/inset change later.
-//          Side effect (desired): header is shorter than before, since
-//          min-height (56px) is less than the old padding-driven total.
-// v1.2.42: Fixed close button getting visually covered by body content
-//          (e.g. thermostat card's dial) when the header is collapsed -
-//          .close-button and .body are both position:relative/absolute
-//          with z-index:auto, which stacks by DOM order, and .body comes
-//          after .close-button in markup. Added explicit z-index: 999 to
-//          .close-button so it always paints above body content,
-//          regardless of what's rendered inside the view.
-// v1.2.41: Added close-align (left/right/hidden, default left) and
-//          title-align (left/right/center/hidden, default left) data
-//          options. Close button moved out of .header entirely - now
-//          rendered independently, absolutely positioned against
-//          .frame, so it no longer takes vertical space and is never
-//          affected by whether a title is present. .header itself now
-//          renders only when title is non-empty AND title-align !==
-//          'hidden' - collapses to zero height otherwise. When the
-//          close button is shown, .header reserves symmetric padding
-//          on BOTH sides for its footprint (not just the occupied
-//          side), so title-align: center/right and close-align: left
-//          combinations never need overlap-specific math - ellipsis
-//          truncation stays correct regardless of which side the
-//          button is on. .frame given static position:relative (kept
-//          out of styles.frame so a user override can't break the
-//          button's positioning).
-// v0.1.40: Modified default padding for sections views
-// v0.1.35: Popup now anchors from the top instead of centering vertically
-//          - .overlay's align-items: center (hardcoded) -> alignItems:
-//          'flex-start' (DEFAULT_OVERLAY_STYLES, overridable). Added
-//          DEFAULT_FRAME_STYLES.marginTop: '10vh' - relative like a
-//          percentage, but physically can't push the popup off-screen
-//          the way a negative margin-top from center could.
-// v0.1.34: Added validation for styles.target values in open(); logs a
-//          warning when a styles target exists but is not an object. Also
-//          added a warning when the supplied view path contains extra
-//          slash-delimited segments beyond dashboard/view.
-// v0.1.30: Replaced panel/non-panel two-value padding with per-view-type
-//          constants (DEFAULT_LAYOUT_PADDING, PANEL_LAYOUT_PADDING,
-//          SECTIONS_LAYOUT_PADDING, MASONRY_LAYOUT_PADDING,
-//          SIDEBAR_LAYOUT_PADDING) via a lookup table keyed by
-//          viewConfig.type, falling back to DEFAULT_LAYOUT_PADDING for
-//          any unmatched/unknown type.
-// v0.1.28: PANEL_VIEW_BODY_PADDING '16px' -> '0px 12px 16px 12px',
-//          NON_PANEL_VIEW_BODY_PADDING '0' -> '0px 0px 0px 0px'.
-//          DEFAULT_FRAME_STYLES: minWidth 580px -> 540px, minHeight
-//          533px -> 10% (matching browser_mod's own classic-style
-//          --mdc-dialog-min-height: 10% default, confirmed via source).
-// v0.1.27: Fixed 0.1.26 - the 16px panel-padding value was hardcoded
-//          inline in render(), not in the Constants section. Extracted
-//          to PANEL_VIEW_BODY_PADDING and NON_PANEL_VIEW_BODY_PADDING.
-//          No behavior change.
-// v0.1.26: .body gets a default 16px padding only when the resolved
-//          view's type is "panel" - confirmed via real HA source that
-//          panel is the only view type with zero built-in spacing;
-//          masonry and sections both already self-pad. styles.body still
-//          overrides either way.
-// v0.1.25: Extracted every remaining default visual value out of static
-//          CSS into named DEFAULT_*_STYLES constants (Constants section),
-//          matching the DEFAULT_FRAME_STYLES pattern - now merged via
-//          styleMap for every target (overlay, frame, header, title,
-//          close-button, body, status), not just frame. Removed dead
-//          max-width:96vw/max-height:96vh from .frame (always overridden
-//          by DEFAULT_FRAME_STYLES' inline 90vw/90vh anyway - unreachable
-//          leftover). TWO EXCEPTIONS, cannot be moved: .close-button:hover
-//          (pseudo-class, no inline equivalent) and .status/.status.error
-//          color (inline styles beat class selectors regardless of order,
-//          so moving color to a default would permanently override the
-//          error-red state - kept as class rules instead).
-// v0.1.24: Redistributed the old close-button's internal 12px cushion
-//          (from its 48px box vs 24px icon) into explicit header
-//          padding/gap, to visually match the pre-0.1.22 header exactly
-//          while keeping the button's actual size at 24px. padding
-//          8px 8px 8px 16px -> 20px 8px 12px 20px, gap 4px -> 16px.
-//          Total header height unchanged (56px), so .body's position
-//          and the v0.1.20 gap fix are unaffected.
-// v0.1.23: header padding 8px 8px 0 8px -> 8px 8px 8px 16px, reverted to
-//          the original v0.1.0 value now that close-button no longer
-//          provides its own built-in spacing (24px, not 48px). NOTE:
-//          this restores the 8px bottom padding that v0.1.20 specifically
-//          removed to close the header-to-content gap - that gap is back.
-// v0.1.22: close-button default size 48px -> 24px, matching the icon
-//          exactly (no extra bounding box). Icon SVG now sized at 100%
-//          of the button instead of a fixed 24px, so any styles.close-button
-//          width/height override scales the icon along with the box,
-//          instead of leaving it fixed size inside a bigger button.
-// v0.1.21: styles: is now nested by target instead of applying only to
-//          the frame. Valid keys: overlay, frame, header, title,
-//          close-button, body, status - each optional, each applied to
-//          its own element. Renamed .backdrop -> .overlay and
-//          .close-btn -> .close-button (CSS + markup) to match. Frame's
-//          previous auto-sizing defaults moved to DEFAULT_FRAME_STYLES,
-//          merged under styles.frame specifically now.
-// v0.1.20: header padding 8px -> 8px 8px 0 8px, removing our own
-//          contribution to the header-to-content gap. Actually applied
-//          this time - previously only described, never written.
-// v0.1.19: Full header rewrite matching HA/browser_mod dialog header
-//          conventions. Fixed the 20x24 SVG sizing bug: default inline
-//          SVG display + flex shrink was compressing width only - added
-//          display:block + flex-shrink:0. Close button 32px -> 48px
-//          (real HA icon-button touch target), header padding matched
-//          to MDC convention, title margin-left:4px for spacing.
+// v1.3.54: Comment-only pass - condensed the intro block and every version-history entry to one line each; no code/logic changes.
+// v1.3.52: Removed .frame padding; increased hui-sections-view default padding (wrapper/container) to 16px.
+// v1.3.51: Added --frame-padding; made hui-sections-view default padding user-adjustable via --sections-wrapper-padding/--sections-container-padding (set under "body").
+// v1.3.50: Migrated styles: from styleMap to adoptedStyleSheets (CSSStyleSheet + static styles = css, var()-driven), matching chrono-hvac-card/chrono-slider-card.
+// v1.2.48: Added default padding for hui-sections-view's internal .wrapper/.container via a scoped adoptedStyleSheets injection.
+// v1.2.47: DEFAULT_FRAME_STYLES.minWidth 480px -> 240px, for narrower popups on mobile.
+// v1.2.46: Fixed title misalignment under content-box sizing; added HEADER_CONTENT_BOX_HEIGHT_PX; close button inset 19px -> 18px.
+// v1.2.45: Decoupled header total height from the button/title alignment point via BUTTON_CENTER_OFFSET_PX; close button inset 16px -> 19px.
+// v1.2.44: Fixed header side padding being reserved on both sides regardless of alignment; added computeHeaderPadding().
+// v1.2.43: Fixed title misalignment vs. close button; extracted CLOSE_BUTTON_SIZE_PX/CLOSE_BUTTON_INSET_TOP_PX; derived HEADER_MIN_HEIGHT from them.
+// v1.2.42: Fixed close button being covered by body content; added z-index: 999.
+// v1.2.41: Added close-align/title-align options; close button moved out of .header to independent absolute positioning.
+// v0.1.40: Modified default padding for sections views.
+// v0.1.35: Popup now anchors from the top instead of centering vertically.
+// v0.1.34: Added validation for styles.target values and for extra view path segments.
+// v0.1.30: Replaced panel/non-panel padding with per-view-type padding constants.
+// v0.1.28: Adjusted panel/non-panel body padding and DEFAULT_FRAME_STYLES min-width/min-height.
+// v0.1.27: Extracted the 16px panel-padding literal into named constants (no behavior change).
+// v0.1.26: .body gets default 16px padding only for panel-type views.
+// v0.1.25: Extracted remaining default visual values into DEFAULT_*_STYLES constants, merged via styleMap for every target.
+// v0.1.24: Redistributed close-button's old internal cushion into explicit header padding/gap.
+// v0.1.23: Reverted header padding to the original v0.1.0 value.
+// v0.1.22: close-button default size 48px -> 24px, matching the icon; icon now scales with the button.
+// v0.1.21: styles: is now nested by target instead of applying only to the frame.
+// v0.1.20: header padding 8px -> 8px 8px 0 8px, closing the header-to-content gap.
+// v0.1.19: Full header rewrite matching HA/browser_mod dialog conventions; fixed SVG sizing bug.
 // v0.1.18: close-btn svg 20px -> 24px, matching browser_mod's close icon.
-// v0.1.16: title font-size 1.25rem -> 1.4rem, compensating for a 14px
-//          document root (14 * 1.4 = ~19.6px, targeting 20px). Tied to
-//          this specific root size - revisit if it doesn't hold on
-//          other installs.
-// v0.1.15: border-radius default 12px -> var(--ha-dialog-border-radius,
-//          28px), matching browser_mod's popup dialog.
-// v0.1.14: Title styling matched to MDC dialog title / browser_mod:
-//          font-size 1.25em -> 1.25rem, added line-height 2rem and
-//          letter-spacing 0.0125em.
-// v0.1.13: Header restyle - close button moved to top-left (before title
-//          in markup), title font-size 1.1em -> 1.25em, header layout
-//          space-between -> flex-start+gap so title sits right after the
-//          button, header background rgba(0,0,0,0.15) -> theme-aware
-//          var(--card-background-color).
-// v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to
-//          the simpler declarative binding - tested and confirmed 0.1.10
-//          (the mount-point fix) was the actual cause, 0.1.9 wasn't
-//          needed. Removed updated(), _attachedView, .view-container.
-// v0.1.10: Fixed the thermostat card (and likely other built-in cards
-//          relying on similarly deep, lazily-registered components)
-//          failing to render inside the popup. Root cause: the popup
-//          host lived on document.body, outside the scoped custom
-//          element registry boundary ha-panel-lovelace establishes for
-//          real Lovelace content - confirmed via HA's actual source for
-//          the failing component (ha-state-control-climate-temperature),
-//          which showed .hass itself was undefined on it despite being
-//          set correctly on its parent. The host now relocates into
-//          ha-panel-lovelace's own shadow root on open(), so everything
-//          we render shares the same registry scope as a normal
-//          dashboard page. KNOWN RISK, not yet confirmed either way:
-//          the backdrop's position:fixed could theoretically be trapped
-//          by a transformed ancestor somewhere in that tree - watch for
-//          mispositioning/clipping specifically, separate from this fix.
-// v0.1.9: Fixed a race where some cards (confirmed: the thermostat card's
-//         +/- stepper control) could throw on first render because .hass
-//         wasn't guaranteed to be set before the element connected and
-//         rendered. <hui-view> is now built imperatively - created, every
-//         property set directly, then appended to the DOM - mirroring
-//         embedded-view-card's proven sequence, instead of being bound
-//         declaratively inside the html`` template where creation and
-//         property-setting happen as part of the same commit.
-// v0.1.8: Fixed content not updating live (e.g. conditional cards not
-//         reacting to a toggle) - the popup sat outside Lovelace's normal
-//         hass-propagation tree, so it only ever had a snapshot from
-//         open() time. Now subscribes to subscribeEntities (from
-//         home-assistant-js-websocket, the same batched mechanism HA's
-//         own frontend uses) while open, and pushes a fresh hass onto the
-//         live <hui-view> on each update. Unsubscribes on close.
-// v0.1.7: Extracted inline hardcoded defaults into named constants near
-//         the top of the file (KNOWN_DATA_KEYS, DEFAULT_STYLES), matching
-//         the DEFAULT_CONFIG/DEFAULT_FIELD convention used across the
-//         chrono-* family. No behavior change - values are unchanged,
-//         only where they're defined.
-// v0.1.6: Removed width/height/background/radius as named top-level keys.
-//         All CSS, including these, now lives under styles: only. The
-//         four values still default to the same auto/580px/90vw/etc.
-//         base, just as fixed values in the styleMap() call rather than
-//         reading from _opts. Added console.warn() for any unrecognized
-//         top-level key (recognized: title, view, styles, dismissable) -
-//         previously these failed silently.
-// v0.1.5: Default popup sizing changed from fixed width:640px/height:480px
-//         to width:auto/height:auto with min-width:580px, max-width:90vw,
-//         min-height:533px, max-height:90vh, so the popup fits its
-//         content by default. data.width/data.height (px shorthand) and
-//         styles (all six properties individually) still override.
-// v0.1.4: Added "styles" - a flat map of arbitrary CSS properties (incl.
-//         "--custom-properties") applied to the popup frame, spread on
-//         top of the width/height/background/radius defaults so user
-//         values always win on conflict.
-// v0.1.3: Renamed the "page" config field to "view" - more accurately
-//         describes what it points to (a dashboard view, disambiguated
-//         by its dashboard). _resolvePage -> _resolveView. No behavior
-//         change beyond the field name.
-// v0.1.2: Renamed from chrono-popup-card to chrono-popup - it's a JS
-//         resource, not a placeable card (no window.customCards entry,
-//         no config schema for an instance). No functional changes.
-// v0.1.1: Replaced panel-only <hui-card> rendering with <hui-view>, so all
-//         view types (panel, masonry, sections, sidebar) are supported.
-//         Added per-user view visibility check (view.visible/visibility/
-//         users), ported from the same rule shape HA's own dashboard and
-//         embedded-view-card use.
-// v0.1.0: Initial version. fire-dom-event trigger, lovelace/config fetch,
-//         panel-view-only rendering via <hui-card>, close via button /
-//         backdrop click / Escape.
+// v0.1.16: title font-size 1.25rem -> 1.4rem.
+// v0.1.15: border-radius default 12px -> var(--ha-dialog-border-radius, 28px).
+// v0.1.14: Title styling matched to MDC dialog title/browser_mod (font-size, line-height, letter-spacing).
+// v0.1.13: Header restyle - close button moved to top-left, title font-size increased, layout/background updated.
+// v0.1.11: Reverted 0.1.9's imperative <hui-view> construction back to declarative binding.
+// v0.1.10: Fixed built-in cards failing to render by relocating the host into ha-panel-lovelace's shadow root.
+// v0.1.9: Fixed a race causing some cards to throw on first render by building <hui-view> imperatively.
+// v0.1.8: Added live entity-update subscription so popup content updates live instead of only at open().
+// v0.1.7: Extracted inline hardcoded defaults into named constants.
+// v0.1.6: Removed width/height/background/radius as top-level keys (styles: only); added unrecognized-key warning.
+// v0.1.5: Default popup sizing changed to auto-fit-content with min/max constraints.
+// v0.1.4: Added "styles" - a flat map of CSS properties applied to the popup frame.
+// v0.1.3: Renamed "page" config field to "view".
+// v0.1.2: Renamed from chrono-popup-card to chrono-popup (JS resource, not a placeable card).
+// v0.1.1: Replaced panel-only <hui-card> rendering with <hui-view>, supporting all view types; added view visibility check.
+// v0.1.0: Initial version - fire-dom-event trigger, lovelace/config fetch, panel-view rendering, close via button/backdrop/Escape.
 
 console.info(
   `%c CHRONO-%cPOPUP %c v${CARD_VERSION} `,
