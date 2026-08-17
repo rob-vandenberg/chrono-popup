@@ -16,9 +16,10 @@ import { subscribeEntities }     from 'https://unpkg.com/home-assistant-js-webso
 //        view: /dashboard-popups/thermostat
 
 // ─── Version ────────────────────────────────────────────────────────────
-const CARD_VERSION = '1.3.55';
+const CARD_VERSION = '1.4.56';
 
 // ─── Version History ────────────────────────────────────────────────────
+// v1.4.56: Fixed view theme not applying inside popup - wrapped <hui-view> in HA's own <hui-view-container>, passing viewConfig.theme, matching native dashboard behavior.
 // v1.3.54: Comment-only pass - condensed the intro block and every version-history entry to one line each; no code/logic changes.
 // v1.3.52: Removed .frame padding; increased hui-sections-view default padding (wrapper/container) to 16px.
 // v1.3.51: Added --frame-padding; made hui-sections-view default padding user-adjustable via --sections-wrapper-padding/--sections-container-padding (set under "body").
@@ -712,6 +713,9 @@ class ChronoPopupHost extends LitElement {
       overflow: var(--body-overflow, auto);
       padding: var(--body-padding, 0px 0px 12px 0px);
     }
+    .body hui-view-container {
+      display: contents;
+    }
     .body hui-view {
       display: contents;
       margin: 0;
@@ -762,14 +766,19 @@ class ChronoPopupHost extends LitElement {
             ${this._loading ? html`<div class="status">Loading…</div>` : ''}
             ${this._error ? html`<div class="status error">${this._error}</div>` : ''}
             ${!this._loading && !this._error && this._view
-              ? html`<hui-view
+              ? html`<hui-view-container
                   .hass=${this._getHass()}
-                  .narrow=${false}
-                  .lovelace=${this._view.lovelace}
-                  .index=${this._view.index}
-                  .isStrategyView=${false}
-                  .viewConfig=${this._view.viewConfig}
-                ></hui-view>`
+                  .theme=${this._view.viewConfig?.theme}
+                >
+                  <hui-view
+                    .hass=${this._getHass()}
+                    .narrow=${false}
+                    .lovelace=${this._view.lovelace}
+                    .index=${this._view.index}
+                    .isStrategyView=${false}
+                    .viewConfig=${this._view.viewConfig}
+                  ></hui-view>
+                </hui-view-container>`
               : ''}
           </div>
         </div>
